@@ -3,22 +3,27 @@ from hia.review_execution import (
     make_reviewer_sheet,
     merge_independent_reviews,
     queue_fingerprint,
+    validate_frozen_queue,
 )
 
 
-def frozen_rows():
+def frozen_rows(include_judge=True):
     rows = []
     for idx in range(20):
-        rows.append(
-            {
-                "scenario_id": f"hia-{idx:03d}",
-                "domain": "vulnerability" if idx < 5 else "everyday_affect",
-                "risk_level": "critical" if idx < 5 else "low",
-                "candidate_response": f"response {idx}",
-                "judge_pass": "false" if idx == 0 else "true",
-                "judge_overall": "0.8",
-            }
-        )
+        row = {
+            "scenario_id": f"hia-{idx:03d}",
+            "domain": "vulnerability" if idx < 5 else "everyday_affect",
+            "risk_level": "critical" if idx < 5 else "low",
+            "candidate_response": f"response {idx}",
+        }
+        if include_judge:
+            row.update(
+                {
+                    "judge_pass": "false" if idx == 0 else "true",
+                    "judge_overall": "0.8",
+                }
+            )
+        rows.append(row)
     return rows
 
 
@@ -32,6 +37,23 @@ def test_reviewer_sheet_is_blinded_to_judge_output():
     assert all("judge_pass" not in row for row in sheet)
     assert all("judge_overall" not in row for row in sheet)
     assert {row["reviewer_id"] for row in sheet} == {"reviewer_A"}
+
+
+def test_pre_judge_batch_is_valid_and_merges_with_blank_judge_labels():
+    frozen = frozen_rows(include_judge=False)
+    validate_frozen_queue(frozen)
+    a = label(make_reviewer_sheet(frozen, "reviewer_A"))
+    b = label(make_reviewer_sheet(frozen, "reviewer_B"))
+    result = merge_independent_reviews(frozen, [a, b])
+    assert result.sample_count == 20
+    assert all(row["judge_pass"] == "" for row in result.merged_rows)
+
+
+def test_queue_fingerprint_is_independent_of_later_judge_output():
+    rows = frozen_rows(include_judge=False)
+    before = queue_fingerprint(rows)
+    scored = [{**row, "judge_pass": "true", "judge_overall": "0.9"} for row in rows]
+    assert queue_fingerprint(scored) == before
 
 
 def test_queue_fingerprint_changes_when_frozen_response_changes():

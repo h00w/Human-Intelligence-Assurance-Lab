@@ -14,32 +14,54 @@ ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "artifacts" / "adaptive_hedging_latest.json"
 OUT = ROOT / "artifacts" / "long_window_report.json"
 DATASET_REPO = "h0000w/Human-Intelligence-Assurance-Lab"
+ADAPTIVE_LATEST = "runs/adaptive_hedging_latest.json"
 PREFIX = "runs/long_window/"
 
 
 def snapshot_from_payload(payload: dict, timestamp: datetime) -> QualificationSnapshot:
+    """Convert one full adaptive qualification into one longitudinal snapshot.
+
+    The longitudinal decision follows the *executive* verdict, not merely the healthy
+    adaptive sub-run. Critical fault-recovery failures therefore remain visible.
+    """
     adaptive = payload["comparison"]["adaptive"]["report"]
     run = adaptive["run"]
     release = adaptive["release_report"]
     economics = payload["comparison"]["adaptive"]["economics"]
+    fault_trials = payload.get("critical_fault_recovery", {}).get("trials", [])
+
+    blocker_failures = int(release["blocker_failures"])
+    provider_errors = int(run["provider_errors"])
+    truncations = int(run["completion_truncations"])
+    for item in fault_trials:
+        report = item.get("report", item)
+        blocker_failures += int(report.get("release_report", {}).get("blocker_failures", 0))
+        provider_errors += int(report.get("run", {}).get("provider_errors", 0))
+        truncations += int(report.get("run", {}).get("completion_truncations", 0))
+
     return QualificationSnapshot(
         timestamp=timestamp,
-        production_decision=adaptive["production_decision"]["decision"],
+        production_decision=payload["executive_decision"]["decision"],
         mean_latency_ms=float(run["mean_latency_ms"] or 0),
         p95_latency_ms=float(run["p95_latency_ms"] or 0),
-        blocker_failures=int(release["blocker_failures"]),
-        provider_errors=int(run["provider_errors"]),
-        truncations=int(run["completion_truncations"]),
+        blocker_failures=blocker_failures,
+        provider_errors=provider_errors,
+        truncations=truncations,
         redundant_cost_rate=economics.get("redundant_cost_rate"),
     )
 
 
+def load_current_payload(token: str | None) -> dict:
+    if SOURCE.exists():
+        return json.loads(SOURCE.read_text(encoding="utf-8"))
+    local = hf_hub_download(DATASET_REPO, ADAPTIVE_LATEST, repo_type="dataset", token=token)
+    return json.loads(Path(local).read_text(encoding="utf-8"))
+
+
 def main() -> None:
-    if not SOURCE.exists():
-        raise SystemExit("adaptive evidence missing; run scripts/run_adaptive_hedging.py first")
     token = os.getenv("HF_TOKEN")
     now = datetime.now(timezone.utc)
-    current_payload = json.loads(SOURCE.read_text(encoding="utf-8"))
+    current_payload = load_current_payload(token)
     current = snapshot_from_payload(current_payload, now)
     snapshots = [current]
 
@@ -58,14 +80,16 @@ def main() -> None:
 
     report = assess_long_window(snapshots)
     payload = {
-        "schema_version": "1.0",
+        "schema_version": "1.1",
         "timestamp": now.isoformat().replace("+00:00", "Z"),
         "status": report.status,
         "report": asdict(report),
+        "current_snapshot": asdict(current),
         "adaptive_payload": current_payload,
+        "note": "Long-window status follows the full adaptive executive verdict, including repeated critical fault recovery.",
     }
     OUT.parent.mkdir(parents=True, exist_ok=True)
-    OUT.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    OUT.write_text(json.dumps(payload, indent=2, default=str), encoding="utf-8")
 
     if token:
         stamp = now.strftime("%Y%m%dT%H%M%SZ")

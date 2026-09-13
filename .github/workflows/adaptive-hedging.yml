@@ -8,8 +8,11 @@ on:
       - 'hia/adaptive.py'
       - 'hia/resilience.py'
       - 'scripts/run_adaptive_hedging.py'
+      - 'scripts/run_long_window_qualification.py'
+      - 'scripts/generate_v1_readiness_manifest.py'
       - '.github/workflows/adaptive-hedging.yml'
       - 'tests/test_phase18.py'
+      - 'tests/test_long_window_snapshot.py'
 
 jobs:
   adaptive-hedging:
@@ -35,10 +38,32 @@ jobs:
       - name: Install
         run: pip install -e .
       - name: Run critical-reserve qualification
+        id: adaptive
+        continue-on-error: true
         run: python scripts/run_adaptive_hedging.py
+      - name: Archive completed adaptive evidence
+        id: archive
+        continue-on-error: true
+        run: python scripts/run_long_window_qualification.py
+      - name: Refresh Phase 1 v1 readiness manifest
+        run: python scripts/generate_v1_readiness_manifest.py
       - name: Upload Phase 1.8.2 evidence
         uses: actions/upload-artifact@v4
         with:
           name: hia-phase-1-8-2-critical-reserve
-          path: artifacts/adaptive_hedging_latest.json
+          path: |
+            artifacts/adaptive_hedging_latest.json
+            artifacts/long_window_report.json
+            artifacts/phase_1_v1_readiness.json
           retention-days: 30
+      - name: Enforce adaptive executive verdict
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          data = json.loads(Path('artifacts/adaptive_hedging_latest.json').read_text())
+          decision = data['executive_decision']['decision']
+          epoch = data.get('qualification_epoch')
+          print(f'adaptive decision: {decision}; epoch: {epoch}')
+          raise SystemExit(0 if decision == 'SHIP' else 2)
+          PY

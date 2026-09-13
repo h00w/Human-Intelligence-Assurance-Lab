@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from scripts.run_long_window_qualification import snapshot_from_payload
+from scripts.run_long_window_qualification import payload_matches_epoch, snapshot_from_payload
 
 
 def test_snapshot_includes_fault_recovery_failure():
@@ -38,3 +38,10 @@ def test_snapshot_includes_fault_recovery_failure():
     assert snapshot.production_decision == "HOLD"
     assert snapshot.provider_errors == 1
     assert snapshot.mean_latency_ms == 1300
+
+
+def test_payload_epoch_must_match_exactly():
+    epoch = "critical-reserve-v1"
+    assert payload_matches_epoch({"qualification_epoch": epoch}, epoch)
+    assert not payload_matches_epoch({}, epoch)
+    assert not payload_matches_epoch({"qualification_epoch": "pre-reserve"}, epoch)

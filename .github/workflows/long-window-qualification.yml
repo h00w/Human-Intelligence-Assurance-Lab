@@ -4,14 +4,6 @@ on:
   workflow_dispatch:
   schedule:
     - cron: '15 3 * * 0'
-  push:
-    branches: [main]
-    paths:
-      - 'hia/drift.py'
-      - 'hia/authoritative.py'
-      - 'scripts/run_long_window_qualification.py'
-      - 'scripts/generate_v1_readiness_manifest.py'
-      - '.github/workflows/long-window-qualification.yml'
 
 jobs:
   qualify:
@@ -37,7 +29,6 @@ jobs:
       - name: Install
         run: pip install -e .
       - name: Run fresh adaptive qualification
-        if: github.event_name != 'push'
         run: python scripts/run_adaptive_hedging.py
       - name: Archive time-separated evidence
         id: archive

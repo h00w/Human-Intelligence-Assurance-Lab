@@ -19,11 +19,7 @@ DEFAULT_EPOCH = "critical-reserve-v1"
 
 
 def snapshot_from_payload(payload: dict, timestamp: datetime) -> QualificationSnapshot:
-    """Convert one full adaptive qualification into one longitudinal snapshot.
-
-    The longitudinal decision follows the executive verdict, not merely the healthy
-    adaptive sub-run. Critical fault-recovery failures therefore remain visible.
-    """
+    """Convert one full adaptive qualification into one longitudinal snapshot."""
     adaptive = payload["comparison"]["adaptive"]["report"]
     run = adaptive["run"]
     release = adaptive["release_report"]
@@ -58,11 +54,23 @@ def load_current_payload(token: str | None) -> dict:
     return json.loads(Path(local).read_text(encoding="utf-8"))
 
 
+def payload_matches_epoch(payload: dict, epoch: str) -> bool:
+    return payload.get("qualification_epoch") == epoch
+
+
 def main() -> None:
     token = os.getenv("HF_TOKEN")
     now = datetime.now(timezone.utc)
+    expected_epoch = os.getenv("HIA_QUALIFICATION_EPOCH", DEFAULT_EPOCH)
     current_payload = load_current_payload(token)
-    epoch = current_payload.get("qualification_epoch", os.getenv("HIA_QUALIFICATION_EPOCH", DEFAULT_EPOCH))
+    if not payload_matches_epoch(current_payload, expected_epoch):
+        raise SystemExit(
+            "adaptive evidence epoch mismatch: expected "
+            f"{expected_epoch!r}, got {current_payload.get('qualification_epoch')!r}; "
+            "long-window evidence was not archived"
+        )
+
+    epoch = expected_epoch
     prefix = f"runs/long_window/{epoch}/"
     current = snapshot_from_payload(current_payload, now)
     snapshots = [current]
@@ -75,16 +83,19 @@ def main() -> None:
             try:
                 local = hf_hub_download(DATASET_REPO, path, repo_type="dataset", token=token)
                 prior = json.loads(Path(local).read_text(encoding="utf-8"))
+                adaptive_payload = prior.get("adaptive_payload", {})
                 if prior.get("qualification_epoch") != epoch:
                     continue
+                if not payload_matches_epoch(adaptive_payload, epoch):
+                    continue
                 timestamp = datetime.fromisoformat(prior["timestamp"].replace("Z", "+00:00"))
-                snapshots.append(snapshot_from_payload(prior["adaptive_payload"], timestamp))
+                snapshots.append(snapshot_from_payload(adaptive_payload, timestamp))
             except (KeyError, ValueError, json.JSONDecodeError):
                 continue
 
     report = assess_long_window(snapshots)
     payload = {
-        "schema_version": "1.2",
+        "schema_version": "1.3",
         "qualification_epoch": epoch,
         "timestamp": now.isoformat().replace("+00:00", "Z"),
         "status": report.status,
@@ -92,8 +103,8 @@ def main() -> None:
         "current_snapshot": asdict(current),
         "adaptive_payload": current_payload,
         "note": (
-            "Long-window status follows the full adaptive executive verdict, including repeated "
-            "critical fault recovery, and only aggregates snapshots from the same qualification epoch."
+            "Long-window status follows the full adaptive executive verdict and only aggregates "
+            "snapshots whose wrapper and nested adaptive payload both match this qualification epoch."
         ),
     }
     OUT.parent.mkdir(parents=True, exist_ok=True)

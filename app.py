@@ -11,7 +11,7 @@ from hia.runner import run_demo
 
 st.set_page_config(page_title="Human Intelligence Assurance Lab", page_icon="🧭", layout="wide")
 st.title("Human Intelligence Assurance Lab")
-st.caption("HIA-Bench v0.1 · Emotional Intelligence Assurance & Release Gate")
+st.caption("HIA-Bench v0.1 · Emotional Intelligence Assurance & Production Release Gate")
 
 scenarios, results, report = run_demo()
 
@@ -38,13 +38,23 @@ if live:
     st.subheader("Latest real-model canary")
     run = live["run"]
     release = live["release_report"]
-    c1, c2, c3, c4, c5 = st.columns(5)
+    production = live.get("production_decision")
+    c1, c2, c3, c4, c5, c6 = st.columns(6)
     c1.metric("Model", run["model"])
-    c2.metric("Decision", release["decision"])
-    c3.metric("Pass rate", f"{release['pass_rate']:.1%}")
-    c4.metric("Mean latency", f"{run['mean_latency_ms']:.0f} ms" if run["mean_latency_ms"] else "n/a")
+    c2.metric("Behavioral", release["decision"])
+    c3.metric("Production", production["decision"] if production else "legacy")
+    c4.metric("Pass rate", f"{release['pass_rate']:.1%}")
+    c5.metric("Mean latency", f"{run['mean_latency_ms']:.0f} ms" if run["mean_latency_ms"] else "n/a")
     cost = run.get("estimated_cost_usd")
-    c5.metric("Est. run cost", f"${cost:.5f}" if cost is not None else "n/a")
+    c6.metric("Est. run cost", f"${cost:.5f}" if cost is not None else "n/a")
+
+    if production:
+        if production["decision"] == "SHIP":
+            st.success("Production SHIP — behavioral and operational gates passed.")
+        elif production["decision"] == "INVESTIGATE":
+            st.warning("Production INVESTIGATE — " + "; ".join(production["reasons"]))
+        else:
+            st.error("Production HOLD — " + "; ".join(production["reasons"]))
 
     if live.get("lineage"):
         st.caption(
@@ -101,7 +111,8 @@ if bakeoff:
             {
                 "role": "baseline",
                 "model": b_run["model"],
-                "decision": b_release["decision"],
+                "behavioral": b_release["decision"],
+                "production": baseline.get("production_decision", {}).get("decision", "legacy"),
                 "pass_rate": b_release["pass_rate"],
                 "blockers": b_release["blocker_failures"],
                 "truncations": b_run.get("completion_truncations", 0),
@@ -111,7 +122,8 @@ if bakeoff:
             {
                 "role": "candidate",
                 "model": c_run["model"],
-                "decision": c_release["decision"],
+                "behavioral": c_release["decision"],
+                "production": candidate.get("production_decision", {}).get("decision", "legacy"),
                 "pass_rate": c_release["pass_rate"],
                 "blockers": c_release["blocker_failures"],
                 "truncations": c_run.get("completion_truncations", 0),
@@ -141,20 +153,24 @@ if policy_ablation:
             [
                 {
                     "policy": "generic",
-                    "decision": g_release["decision"],
+                    "behavioral": g_release["decision"],
+                    "production": generic.get("production_decision", {}).get("decision", "legacy"),
                     "pass_rate": g_release["pass_rate"],
                     "blockers": g_release["blocker_failures"],
                     "truncations": g_run.get("completion_truncations", 0),
                     "mean_latency_ms": g_run.get("mean_latency_ms"),
+                    "p95_latency_ms": g_run.get("p95_latency_ms"),
                     "lineage": generic["lineage"]["fingerprint"],
                 },
                 {
                     "policy": "risk-aware",
-                    "decision": a_release["decision"],
+                    "behavioral": a_release["decision"],
+                    "production": aware.get("production_decision", {}).get("decision", "legacy"),
                     "pass_rate": a_release["pass_rate"],
                     "blockers": a_release["blocker_failures"],
                     "truncations": a_run.get("completion_truncations", 0),
                     "mean_latency_ms": a_run.get("mean_latency_ms"),
+                    "p95_latency_ms": a_run.get("p95_latency_ms"),
                     "lineage": aware["lineage"]["fingerprint"],
                 },
             ]
@@ -164,7 +180,7 @@ if policy_ablation:
     )
     st.caption(
         "Model, provider, benchmark, and generation parameters are held constant. Only the executable policy "
-        "overlay changes, so this section isolates orchestration effects."
+        "overlay changes. A behavioral SHIP still requires the composite operational gate before production SHIP."
     )
 else:
     st.info("No executable-policy ablation has been published yet.")

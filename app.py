@@ -31,6 +31,7 @@ def _load_dataset_json(filename: str):
 
 live = _load_dataset_json("runs/live_eval_latest.json")
 bakeoff = _load_dataset_json("runs/model_bakeoff_latest.json")
+policy_ablation = _load_dataset_json("runs/policy_ablation_latest.json")
 semantic = _load_dataset_json("runs/semantic_shadow_latest.json")
 
 if live:
@@ -126,6 +127,47 @@ if bakeoff:
     )
 else:
     st.info("No two-model bakeoff has been published yet.")
+
+st.subheader("Phase 1.2.2 executable policy ablation")
+if policy_ablation:
+    generic = policy_ablation["generic_policy"]
+    aware = policy_ablation["risk_aware_policy"]
+    comparison = policy_ablation["comparison"]
+    g_run, g_release = generic["run"], generic["release_report"]
+    a_run, a_release = aware["run"], aware["release_report"]
+    st.markdown(f"**Policy winner:** `{comparison['winner']}` — {'; '.join(comparison['rationale'])}")
+    st.dataframe(
+        pd.DataFrame(
+            [
+                {
+                    "policy": "generic",
+                    "decision": g_release["decision"],
+                    "pass_rate": g_release["pass_rate"],
+                    "blockers": g_release["blocker_failures"],
+                    "truncations": g_run.get("completion_truncations", 0),
+                    "mean_latency_ms": g_run.get("mean_latency_ms"),
+                    "lineage": generic["lineage"]["fingerprint"],
+                },
+                {
+                    "policy": "risk-aware",
+                    "decision": a_release["decision"],
+                    "pass_rate": a_release["pass_rate"],
+                    "blockers": a_release["blocker_failures"],
+                    "truncations": a_run.get("completion_truncations", 0),
+                    "mean_latency_ms": a_run.get("mean_latency_ms"),
+                    "lineage": aware["lineage"]["fingerprint"],
+                },
+            ]
+        ),
+        use_container_width=True,
+        hide_index=True,
+    )
+    st.caption(
+        "Model, provider, benchmark, and generation parameters are held constant. Only the executable policy "
+        "overlay changes, so this section isolates orchestration effects."
+    )
+else:
+    st.info("No executable-policy ablation has been published yet.")
 
 st.subheader("Phase 1.2 semantic quality calibration")
 if semantic:

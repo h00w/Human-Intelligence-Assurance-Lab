@@ -1,0 +1,40 @@
+name: Phase 1.8 Adaptive Hedging
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'hia/adaptive.py'
+      - 'hia/resilience.py'
+      - 'scripts/run_adaptive_hedging.py'
+      - '.github/workflows/adaptive-hedging.yml'
+      - 'tests/test_phase18.py'
+
+jobs:
+  adaptive-hedging:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      HIA_ADAPTIVE_MODEL: meta-llama/Llama-3.1-8B-Instruct
+      HIA_ADAPTIVE_PRIMARY: nscale
+      HIA_ADAPTIVE_FALLBACK: novita
+      HIA_ADAPTIVE_TRIALS: '5'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install
+        run: pip install -e .
+      - name: Run adaptive hedging qualification
+        run: python scripts/run_adaptive_hedging.py
+      - name: Upload Phase 1.8 evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: hia-phase-1-8-adaptive-hedging
+          path: artifacts/adaptive_hedging_latest.json
+          retention-days: 30

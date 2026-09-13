@@ -8,7 +8,13 @@ from pathlib import Path
 
 from huggingface_hub import HfApi, hf_hub_download
 
-from hia.review_execution import REVIEWER_FIELDS, csv_bytes, make_reviewer_sheet, queue_fingerprint, validate_frozen_queue
+from hia.review_execution import (
+    REVIEWER_FIELDS,
+    csv_bytes,
+    make_reviewer_sheet,
+    queue_fingerprint,
+    validate_frozen_queue,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 ARTIFACTS = ROOT / "artifacts"

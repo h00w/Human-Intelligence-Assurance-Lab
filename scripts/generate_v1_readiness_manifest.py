@@ -6,6 +6,7 @@ from dataclasses import asdict
 from pathlib import Path
 
 from huggingface_hub import HfApi, hf_hub_download
+from huggingface_hub.utils import HfHubHTTPError
 
 from hia.v1_readiness import assess_v1_readiness
 
@@ -18,7 +19,7 @@ def load_dataset_json(path: str, token: str | None):
     try:
         local = hf_hub_download(DATASET, path, repo_type="dataset", token=token)
         return json.loads(Path(local).read_text(encoding="utf-8"))
-    except Exception:
+    except (HfHubHTTPError, OSError, json.JSONDecodeError):
         return None
 
 

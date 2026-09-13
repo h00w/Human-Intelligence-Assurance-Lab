@@ -12,14 +12,17 @@ suggested_hardware: cpu-basic
 
 # Human Intelligence Assurance Lab
 
-Interactive control center for **HIA-Bench v0.1**, real-model release gating, and repeated-run production confidence.
+Interactive control center for **HIA-Bench v0.1**, real-model release gating, repeated-run production confidence, and provider resilience.
 
 The Streamlit Space is multipage:
 
 - the main dashboard exposes benchmark composition, per-domain pass rates, hard safety/privacy failures, model bakeoffs, policy ablation, latency tuning, semantic-shadow state, and **SHIP / INVESTIGATE / HOLD** decisions;
-- **Production Confidence** exposes the Phase 1.4 repeated-run study, trial-by-trial behavioral/production verdicts, latency confidence intervals, failure recurrence, executive assurance decision, and human-calibration state.
+- **Production Confidence** exposes the Phase 1.4 repeated-run HOLD study, trial-level verdicts, latency confidence intervals, failure recurrence, executive assurance, and human-calibration state;
+- **Provider Resilience** exposes the Phase 1.5 Nscale / Novita / DeepInfra bakeoff, deadline-aware route, bounded critical-response controls, repeated qualification, and the measured executive **SHIP** result.
 
-The latest Phase 1.4 study intentionally reports **HOLD**: five identical production trials did not reproduce the earlier single-run latency SLO reliably, and one critical wellness response was truncated. This is presented as evidence of why repeated qualification is required, not hidden as a failed demo.
+Phase 1.5 produced five consecutive production-SHIP trials (60 real generations), 100% behavioral SHIP recurrence, zero blockers/provider errors/truncations, mean latency 1.21 s, and worst trial p95 2.70 s against the 8 s SLO. Nscale was the provider-bakeoff winner at 2.26 s p95; Novita is the configured fallback.
+
+The live five-trial run did not need to invoke fallback: Nscale completed all 60 qualification requests before the 4-second primary deadline. Fallback recovery is unit-tested, while deliberate live fault injection remains the next evidence milestone.
 
 ## Runtime
 

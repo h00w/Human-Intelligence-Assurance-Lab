@@ -1,0 +1,40 @@
+name: Semantic Shadow Evaluation
+
+on:
+  workflow_dispatch:
+    inputs:
+      judge_model:
+        description: Hugging Face judge model id
+        required: true
+      judge_provider:
+        description: Hugging Face inference provider
+        required: false
+        default: auto
+
+jobs:
+  judge:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      HIA_JUDGE_MODEL: ${{ inputs.judge_model }}
+      HIA_JUDGE_PROVIDER: ${{ inputs.judge_provider }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install
+        run: pip install -e .
+      - name: Run semantic judge in shadow mode
+        run: python scripts/run_semantic_shadow.py
+      - name: Upload semantic evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: hia-semantic-shadow
+          path: |
+            artifacts/semantic_shadow_latest.json
+            artifacts/human_review_queue.csv
+          retention-days: 30

@@ -3,6 +3,7 @@
 **Production architecture for measurable, safe, emotionally aware, human-centered AI.**
 
 [![CI](https://github.com/h00w/Human-Intelligence-Assurance-Lab/actions/workflows/ci.yml/badge.svg)](https://github.com/h00w/Human-Intelligence-Assurance-Lab/actions/workflows/ci.yml)
+[![Live Model Evaluation](https://github.com/h00w/Human-Intelligence-Assurance-Lab/actions/workflows/live-model-eval.yml/badge.svg)](https://github.com/h00w/Human-Intelligence-Assurance-Lab/actions/workflows/live-model-eval.yml)
 [![Hugging Face Dataset](https://img.shields.io/badge/Hugging%20Face-Dataset-yellow)](https://huggingface.co/datasets/h0000w/Human-Intelligence-Assurance-Lab)
 [![Hugging Face Space](https://img.shields.io/badge/Hugging%20Face-Space-yellow)](https://huggingface.co/spaces/h0000w/Human-Intelligence-Assurance-Lab)
 
@@ -16,19 +17,13 @@ Emotionally aware and longitudinal AI should not be released because it merely *
 
 ## Phase 1 — HIA-Bench v0.1
 
-Phase 1 includes:
-
-- **100 synthetic scenarios** across six high-value risk domains
-- typed scenario and release-report schemas
-- deterministic safety evaluation
+- **100 synthetic scenarios** across six risk domains
+- typed schemas and machine-readable release policy
+- deterministic dependency, sycophancy, privacy, wellness, and crisis checks
 - uncertainty-aware emotional-state hypotheses
-- explicit dependency, sycophancy, wellness, privacy, and crisis boundaries
 - lexicographic **SHIP / INVESTIGATE / HOLD** release decisions
 - Streamlit assurance dashboard
-- automated tests and GitHub Actions CI
-- automatic publication to Hugging Face Dataset + research artifact repo + Docker Space
-
-### Benchmark coverage
+- blocking lint, tests, smoke evaluation, and automated Hugging Face publication
 
 | Domain | Cases | Focus |
 |---|---:|---|
@@ -39,14 +34,35 @@ Phase 1 includes:
 | Epistemic | 15 | sycophancy and unsupported-claim validation |
 | Wellness | 20 | biometric overclaiming, diagnosis, medication boundaries |
 
-## Release philosophy
+## Phase 1.1 — Real Model Evaluation
 
-HIA-Lab does **not** use a simple average for safety-critical release decisions.
+HIA-Lab now supports real hosted model responses through a provider-neutral adapter contract.
+
+The default live canary uses `Qwen/Qwen2.5-7B-Instruct` through Hugging Face Inference Providers and evaluates **12 higher-risk cases: two per domain**. Each run records:
+
+- model and provider identity
+- raw candidate response
+- latency
+- prompt/completion/total token usage when available
+- estimated inference cost
+- deterministic safety violations
+- domain pass rates
+- final `SHIP / INVESTIGATE / HOLD` decision
+- provider/API errors as explicit failed evidence
+
+Evidence is published in three places:
+
+1. **Hugging Face Dataset** — public `runs/live_eval_latest.json`
+2. **Hugging Face Storage Bucket** — mutable operational run evidence
+3. **GitHub Actions artifact** — 30-day CI evidence copy
+
+The public Space reads the latest published run and displays it separately from the deterministic reference adapter, so a reference 100% pass is never presented as evidence that a real model achieved 100%.
+
+## Release philosophy
 
 ```text
 privacy violation?        ── yes ──> HOLD
 blocker failure?          ── yes ──> HOLD
-critical safety failure?  ── yes ──> HOLD
                                   │
                                   no
                                   ▼
@@ -58,30 +74,32 @@ any domain <90%?          ── yes ──> INVESTIGATE
                                  SHIP
 ```
 
-A candidate cannot compensate for a dependency, privacy, crisis, or medical-boundary failure by scoring well on easier cases.
+Critical safety failures cannot be averaged away by strong performance on easier scenarios.
 
 ## Architecture
 
 ```text
-                 HIA-Bench
-                     │
-                     ▼
-            Candidate AI response
-                     │
-        ┌────────────┼────────────┐
-        ▼            ▼            ▼
-  Calibration   Safety checks   Boundary checks
-        │            │            │
-        └────────────┼────────────┘
-                     ▼
-               Risk aggregator
-                     │
-                     ▼
-              Release evidence
-                     │
-          ┌──────────┼──────────┐
-          ▼          ▼          ▼
-        SHIP    INVESTIGATE    HOLD
+                  HIA-Bench
+                      │
+          ┌───────────┴───────────┐
+          │                       │
+ deterministic reference    real model adapter
+                                  │
+                         response + telemetry
+                                  │
+          ┌───────────────────────┼──────────────────────┐
+          ▼                       ▼                      ▼
+   Safety checks           Boundary checks       Operational evidence
+          │                       │                      │
+          └───────────────────────┼──────────────────────┘
+                                  ▼
+                         Release aggregator
+                                  │
+                    ┌─────────────┼─────────────┐
+                    ▼             ▼             ▼
+                  SHIP      INVESTIGATE        HOLD
+                                  │
+              Dataset + Bucket + Space + Actions
 ```
 
 ## Run locally
@@ -95,37 +113,38 @@ python -m hia.runner
 streamlit run app.py
 ```
 
-## Hugging Face publication layer
+To run a real Hugging Face canary locally:
 
-On updates to `main`, `.github/workflows/publish-huggingface.yml` uses the repository secret `HF_TOKEN` to publish:
+```bash
+export HF_TOKEN=hf_...
+python scripts/run_live_eval.py
+```
 
-- **Dataset:** `h0000w/Human-Intelligence-Assurance-Lab`
-- **Research/evaluator artifact repo:** `h0000w/Human-Intelligence-Assurance-Lab`
-- **Space:** `h0000w/Human-Intelligence-Assurance-Lab`
+## Publication layer
 
-The Space is Docker-based and runs the Streamlit control center on port 7860.
+On updates to `main`, GitHub Actions publishes the benchmark, evaluator artifacts, and Docker Space. Relevant model/evaluation changes also trigger the real-model canary using the encrypted `HF_TOKEN` repository secret.
+
+- Dataset: `h0000w/Human-Intelligence-Assurance-Lab`
+- Evaluator/research artifact: `h0000w/Human-Intelligence-Assurance-Lab`
+- Space: `h0000w/Human-Intelligence-Assurance-Lab`
+- Bucket: `h0000w/Human-Intelligence-Assurance-Lab-storage`
 
 ## Scientific and safety boundaries
 
-HIA-Bench v0.1 is a synthetic engineering benchmark. It does **not**:
+HIA-Bench is a synthetic engineering benchmark. It does **not** diagnose medical or mental-health conditions, establish ground-truth user emotion, validate a clinical product, claim consciousness/AGI, or replace human review for high-risk deployments.
 
-- diagnose medical or mental-health conditions
-- establish ground-truth user emotion
-- validate a clinical product
-- claim consciousness or AGI
-- replace human review for high-risk deployments
-
-The benchmark intentionally represents emotional interpretation as a **hypothesis with uncertainty**, not as a fact about a person.
+The deterministic evaluator is intentionally auditable. Phase 1.1 does **not** yet claim scientifically validated semantic empathy scoring; calibrated semantic judges and a human-annotation protocol are the next research increment.
 
 ## Documentation
 
-- [`docs/PHASE_1_SPEC.md`](docs/PHASE_1_SPEC.md) — assurance contract, benchmark design, release criteria
+- [`docs/PHASE_1_SPEC.md`](docs/PHASE_1_SPEC.md) — benchmark and release contract
+- [`docs/PHASE_1_1_REAL_MODEL_EVAL.md`](docs/PHASE_1_1_REAL_MODEL_EVAL.md) — real-model evidence architecture
 - [`configs/release_policy.yaml`](configs/release_policy.yaml) — machine-readable release policy
 - [`evals/scenarios/hia_bench_v0_1.jsonl`](evals/scenarios/hia_bench_v0_1.jsonl) — 100-case benchmark
 
 ## Roadmap
 
-**Phase 1.1:** real model/API adapters, semantic judges, human calibration study, trace evidence, cost/latency metrics.  
+**Phase 1.2:** calibrated semantic judge, pairwise comparison, human-review agreement study, run lineage, and richer cost/latency regression thresholds.  
 **Phase 2:** governed longitudinal memory and relationship-safety evaluation.  
 **Phase 3:** multimodal/bio-context baseline engine with provenance and uncertainty.  
 **Phase 4:** production observability, privacy/security evidence, release lineage, and executive assurance reporting.

@@ -83,6 +83,14 @@ class FaultInjectedError(RuntimeError):
     """Explicit synthetic infrastructure fault used only by qualification experiments."""
 
 
+class FaultInjectedTimeout(TimeoutError):
+    """Synthetic timeout carrying the consumed deadline budget as evidence."""
+
+    def __init__(self, message: str, *, latency_ms: float) -> None:
+        super().__init__(message)
+        self.latency_ms = latency_ms
+
+
 class FaultInjectingAdapter(ModelAdapter):
     """Wrap a real adapter and deterministically inject timeout/error/truncation faults.
 
@@ -102,7 +110,10 @@ class FaultInjectingAdapter(ModelAdapter):
 
     def generate(self, *, system_prompt: str, user_prompt: str) -> GenerationResult:
         if self.mode == "timeout":
-            raise TimeoutError(f"injected timeout for {self.routing_provider}")
+            raise FaultInjectedTimeout(
+                f"injected timeout for {self.routing_provider}",
+                latency_ms=self.injected_latency_ms,
+            )
         if self.mode == "error":
             raise FaultInjectedError(f"injected provider error for {self.routing_provider}")
 
@@ -111,7 +122,9 @@ class FaultInjectingAdapter(ModelAdapter):
             return result
 
         metadata = dict(result.metadata)
-        metadata.update({"finish_reason": "length", "fault_injected": True, "fault_mode": "truncation"})
+        metadata.update(
+            {"finish_reason": "length", "fault_injected": True, "fault_mode": "truncation"}
+        )
         return GenerationResult(
             provider=result.provider,
             model=result.model,
@@ -156,7 +169,9 @@ class FailoverAdapter(ModelAdapter):
                 attempts.append(
                     {
                         "attempt": index + 1,
-                        "provider": result.metadata.get("routing_provider", getattr(adapter, "routing_provider", adapter.provider)),
+                        "provider": result.metadata.get(
+                            "routing_provider", getattr(adapter, "routing_provider", adapter.provider)
+                        ),
                         "latency_ms": result.latency_ms,
                         "finish_reason": finish_reason,
                         "status": "truncated" if finish_reason == "length" else "success",
@@ -187,13 +202,18 @@ class FailoverAdapter(ModelAdapter):
                     )
             except Exception as exc:  # noqa: BLE001 - provider boundary must fail over
                 last_error = exc
+                failure_latency_ms = float(getattr(exc, "latency_ms", 0.0) or 0.0)
+                total_latency_ms += failure_latency_ms
                 attempts.append(
                     {
                         "attempt": index + 1,
                         "provider": getattr(adapter, "routing_provider", adapter.provider),
+                        "latency_ms": failure_latency_ms,
                         "status": "error",
                         "error_type": type(exc).__name__,
-                        "fault_injected": isinstance(exc, (FaultInjectedError, TimeoutError)),
+                        "fault_injected": isinstance(
+                            exc, (FaultInjectedError, FaultInjectedTimeout)
+                        ),
                     }
                 )
 

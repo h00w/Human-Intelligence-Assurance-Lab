@@ -8,8 +8,8 @@ from pathlib import Path
 from huggingface_hub import HfApi, hf_hub_download
 
 from hia.adapters import HuggingFaceAdapter
-from hia.semantic_judge import judge_response
 from hia.schema import Scenario
+from hia.semantic_judge import judge_response
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "artifacts" / "semantic_shadow_latest.json"

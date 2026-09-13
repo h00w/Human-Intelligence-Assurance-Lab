@@ -9,6 +9,7 @@ jobs:
     permissions:
       contents: read
     env:
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
       HIA_DEDICATED_ENDPOINT: ${{ secrets.HIA_DEDICATED_ENDPOINT }}
       HIA_DEDICATED_API_KEY: ${{ secrets.HIA_DEDICATED_API_KEY }}
       HIA_DEDICATED_MODEL: ${{ vars.HIA_DEDICATED_MODEL }}

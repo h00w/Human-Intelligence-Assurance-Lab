@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from statistics import mean
-from typing import Iterable
 
 from .adapters.base import GenerationResult, ModelAdapter
 
@@ -56,7 +56,12 @@ def select_provider(reports: dict[str, dict], *, p95_slo_ms: float = 8000.0) -> 
         and candidate.p95_latency_ms is not None
         and candidate.p95_latency_ms <= p95_slo_ms
     ]
-    eligible.sort(key=lambda item: (item.p95_latency_ms or float("inf"), item.mean_latency_ms or float("inf")))
+    eligible.sort(
+        key=lambda item: (
+            item.p95_latency_ms or float("inf"),
+            item.mean_latency_ms or float("inf"),
+        )
+    )
     if not eligible:
         return ProviderSelection(
             winner=None,
@@ -116,7 +121,9 @@ class FailoverAdapter(ModelAdapter):
                     metadata.update(
                         {
                             "failover_attempts": attempts,
-                            "selected_provider": result.metadata.get("routing_provider", adapter.provider),
+                            "selected_provider": result.metadata.get(
+                                "routing_provider", adapter.provider
+                            ),
                             "failover_used": index > 0,
                         }
                     )
@@ -131,7 +138,7 @@ class FailoverAdapter(ModelAdapter):
                         estimated_cost_usd=result.estimated_cost_usd,
                         metadata=metadata,
                     )
-            except Exception as exc:  # provider/timeout errors are evidence and trigger fallback
+            except Exception as exc:  # noqa: BLE001 - provider boundary must fail over
                 last_error = exc
                 attempts.append(
                     {
@@ -147,7 +154,9 @@ class FailoverAdapter(ModelAdapter):
             metadata.update(
                 {
                     "failover_attempts": attempts,
-                    "selected_provider": last_result.metadata.get("routing_provider", last_result.provider),
+                    "selected_provider": last_result.metadata.get(
+                        "routing_provider", last_result.provider
+                    ),
                     "failover_used": len(attempts) > 1,
                 }
             )

@@ -1,3 +1,4 @@
+# ruff: noqa: I001
 from __future__ import annotations
 
 import json
@@ -82,8 +83,6 @@ def main() -> None:
     calibration_scenarios = select_canary(all_scenarios, per_domain=2)
     risk_by_prompt = {s.input.user_message: s.risk_level for s in all_scenarios}
 
-    # Measure the current primary route first. The adaptive schedule is derived only from
-    # this run's latency distribution, then frozen for all comparison/qualification runs.
     calibration = run_model_evaluation(
         adapter(model, primary, token),
         calibration_scenarios,
@@ -91,14 +90,15 @@ def main() -> None:
     )
     policy = AdaptiveHedgePolicy.from_latencies(latencies(calibration))
 
-    adaptive = AdaptiveHedgedAdapter(
-        adapter(model, primary, token),
-        adapter(model, fallback, token),
-        policy=policy,
-        risk_by_prompt=risk_by_prompt,
-    )
     adaptive_report = run_model_evaluation(
-        adaptive, eval_scenarios, system_prompt_builder=risk_aware_system_prompt
+        AdaptiveHedgedAdapter(
+            adapter(model, primary, token),
+            adapter(model, fallback, token),
+            policy=policy,
+            risk_by_prompt=risk_by_prompt,
+        ),
+        eval_scenarios,
+        system_prompt_builder=risk_aware_system_prompt,
     )
 
     fixed_report = run_model_evaluation(
@@ -111,7 +111,6 @@ def main() -> None:
         system_prompt_builder=risk_aware_system_prompt,
     )
 
-    # Critical-path fault recovery uses the risk-derived critical delay.
     critical_cases = [s for s in eval_scenarios if s.risk_level == "critical"]
     timeout_primary = FaultInjectingAdapter(
         adapter(model, primary, token), mode="timeout", latency_ms=4000, sleep_before_fault=True
@@ -235,18 +234,29 @@ def main() -> None:
     )
     batch_bucket_files(BUCKET, add=[(str(OUT), "runs/adaptive_hedging_latest.json")], token=token)
 
-    print(json.dumps({
-        "derived_delays_ms": policy.delays_ms,
-        "adaptive": {"production": adaptive_report["production_decision"]["decision"], **adaptive_econ},
-        "fixed": {"production": fixed_report["production_decision"]["decision"], **fixed_econ},
-        "critical_timeout": {
-            "production": timeout_report["production_decision"]["decision"],
-            "mean_latency_ms": timeout_report["run"]["mean_latency_ms"],
-            "p95_latency_ms": timeout_report["run"]["p95_latency_ms"],
-        },
-        "stable": stability.stable,
-        "decision": payload["executive_decision"]["decision"],
-    }, indent=2))
+    print(
+        json.dumps(
+            {
+                "derived_delays_ms": policy.delays_ms,
+                "adaptive": {
+                    "production": adaptive_report["production_decision"]["decision"],
+                    **adaptive_econ,
+                },
+                "fixed": {
+                    "production": fixed_report["production_decision"]["decision"],
+                    **fixed_econ,
+                },
+                "critical_timeout": {
+                    "production": timeout_report["production_decision"]["decision"],
+                    "mean_latency_ms": timeout_report["run"]["mean_latency_ms"],
+                    "p95_latency_ms": timeout_report["run"]["p95_latency_ms"],
+                },
+                "stable": stability.stable,
+                "decision": payload["executive_decision"]["decision"],
+            },
+            indent=2,
+        )
+    )
 
 
 if __name__ == "__main__":

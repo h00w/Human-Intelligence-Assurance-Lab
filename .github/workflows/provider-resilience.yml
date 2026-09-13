@@ -1,0 +1,52 @@
+name: Phase 1.5 Provider Resilience
+
+on:
+  workflow_dispatch:
+    inputs:
+      providers:
+        description: Comma-separated Hugging Face inference providers
+        required: false
+        default: novita,nscale,deepinfra
+      trials:
+        description: Repeated failover qualification trials
+        required: false
+        default: '5'
+  push:
+    branches: [main]
+    paths:
+      - 'hia/policy.py'
+      - 'hia/resilience.py'
+      - 'hia/adapters/huggingface.py'
+      - 'scripts/run_provider_resilience.py'
+      - '.github/workflows/provider-resilience.yml'
+
+jobs:
+  resilience:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      HIA_RESILIENCE_MODEL: meta-llama/Llama-3.1-8B-Instruct
+      HIA_RESILIENCE_PROVIDERS: ${{ inputs.providers || 'novita,nscale,deepinfra' }}
+      HIA_RESILIENCE_TRIALS: ${{ inputs.trials || '5' }}
+      HIA_CANARY_PER_DOMAIN: '2'
+      HIA_BAKEOFF_TIMEOUT_S: '8'
+      HIA_PRIMARY_TIMEOUT_S: '4'
+      HIA_FALLBACK_TIMEOUT_S: '4'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install
+        run: pip install -e .
+      - name: Run provider bakeoff and repeated failover qualification
+        run: python scripts/run_provider_resilience.py
+      - name: Upload Phase 1.5 evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: hia-phase-1-5-provider-resilience
+          path: artifacts/provider_resilience_latest.json
+          retention-days: 30

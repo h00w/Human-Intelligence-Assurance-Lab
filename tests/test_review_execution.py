@@ -1,4 +1,9 @@
-from hia.review_execution import apply_adjudications, make_reviewer_sheet, merge_independent_reviews, queue_fingerprint
+from hia.review_execution import (
+    apply_adjudications,
+    make_reviewer_sheet,
+    merge_independent_reviews,
+    queue_fingerprint,
+)
 
 
 def frozen_rows():

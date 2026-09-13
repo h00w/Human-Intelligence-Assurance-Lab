@@ -1,6 +1,6 @@
 # Phase 1 Maturity Status
 
-Updated from the first post-Phase-1.8 longitudinal qualification on 2026-09-13.
+Updated after the Phase 1.8.2 critical-resilience remediation and first valid `critical-reserve-v1` longitudinal snapshot on 2026-09-13.
 
 ## Frozen Phase 1.8 release
 
@@ -14,35 +14,76 @@ Updated from the first post-Phase-1.8 longitudinal qualification on 2026-09-13.
 
 The frozen release evidence and later operational evidence are intentionally distinct.
 
-## Current operational longitudinal evidence
+## Observed operational regression
 
-The first maturity-window run (`34774828228`) produced:
+The first post-release maturity run (`34774828228`) found one real Novita `ReadTimeout` while Nscale was deliberately unavailable. The full executive result was **HOLD**. This evidence remains retained and auditable; it was not rerun away.
 
-- healthy adaptive sub-run: production **SHIP**;
-- healthy adaptive mean latency: **1.351 s**;
-- healthy adaptive p95 latency: **2.696 s**;
-- healthy repeated qualification: stable;
-- repeated critical-timeout trial 1: **SHIP**;
-- repeated critical-timeout trial 2: **HOLD**, one final provider error;
-- repeated critical-timeout trial 3: **SHIP**;
-- full adaptive executive decision: **HOLD**.
+## Phase 1.8.2 remediation
 
-The original long-window archiver initially looked only at the healthy adaptive sub-run and reported `WAITING`. That was a provenance defect. It has been corrected: longitudinal snapshots now follow the full executive decision and aggregate provider errors/blockers/truncations from repeated critical fault recovery.
+Phase 1.8.2 introduced a versioned **critical resilience reserve**:
 
-The unfavorable operational result is retained. It is not rerolled away to preserve a green status.
+- policy: `adaptive-1.8.2-critical-reserve`;
+- qualification epoch: `critical-reserve-v1`;
+- critical hedge ceiling: **1000 ms**;
+- fallback request budget: **6.5 s**;
+- reserved margin: **0.5 s**;
+- unchanged p95 contract: `1.0 + 6.5 + 0.5 = 8.0 s`.
+
+High-, medium-, and low-risk hedge delays remain latency-distribution-derived. Safety, completeness and latency thresholds were not weakened.
+
+The first implementation qualification (`34776228466`) SHIPPED, but it was not admitted as the longitudinal baseline because a concurrent long-window workflow exposed a sequencing race. That race was documented and fixed. Longitudinal evidence now requires the wrapper and nested adaptive payload to carry the exact same epoch, and adaptive qualification archives its completed evidence in-sequence.
+
+## First valid critical-reserve-v1 baseline
+
+Post-fix workflow run `34776572377`, artifact `10324301112`, digest `sha256:a0ba22e515cb137aea2f758703b6a2d66ee91d35b478305bc386ce024ec0fd56`:
+
+- adaptive executive decision: **SHIP**;
+- critical hedge: **1000 ms**;
+- derived high/medium/low delays: **1380.73 / 1480.68 / 1962.78 ms**;
+- fallback timeout: **6.5 s**;
+- healthy adaptive production: **SHIP**;
+- healthy adaptive hedge rate: **54.17%**;
+- healthy adaptive fallback-winner rate: **8.33%**;
+- healthy adaptive redundant token rate: **35.25%**;
+- healthy adaptive redundant cost rate: **24.65%**;
+- repeated healthy qualification: **stable**.
+
+Repeated forced-primary-timeout critical recovery:
+
+| Trial | Production | Mean | p95 | Final provider errors |
+|---|---|---:|---:|---:|
+| 1 | SHIP | 2.115 s | 2.351 s | 0 |
+| 2 | SHIP | 2.230 s | 2.400 s | 0 |
+| 3 | SHIP | 2.250 s | 2.428 s | 0 |
+
+All three critical recovery trials passed the unchanged production contract.
+
+## Long-window state
+
+The first **valid** `critical-reserve-v1` snapshot is now archived:
+
+- status: **WAITING**;
+- window count: **1**;
+- observation span: **0 days**;
+- SHIP rate: **100%**;
+- mean latency: **1.588 s**;
+- worst p95 latency: **3.117 s**.
+
+`WAITING` is the correct state. Maturity requires at least three independent qualification windows spanning at least seven days. A same-day successful remediation is not promoted to mature evidence.
 
 ## Current maturity gates
 
 | Gate | Current state | What is required |
 |---|---|---|
 | Frozen Phase 1.8 qualification | **SHIP** | complete |
+| Phase 1.8.2 critical-resilience remediation | **SHIP** | complete for the tested configuration/window |
 | Human semantic calibration | **BLOCKED** | >=20 resolved samples, >=2 independent reviewers/sample, inter-reviewer kappa >=0.70, judge-vs-human kappa >=0.70, critical-failure recall >=0.95 |
-| Long-window qualification | **HOLD / accumulating** | later versioned evidence must demonstrate a mature time-separated production window after the observed resilience regression is addressed |
+| Long-window qualification | **WAITING / accumulating** | >=3 valid same-epoch windows over >=7 days with no production-contract violation |
 | Dedicated infrastructure | **NOT_CONFIGURED** | explicit endpoint + credential, then same safety/completeness/SLO qualification |
 | Phase 1 v1.0 | **BLOCKED** | all required maturity gates satisfied |
 
 ## Evidence integrity rule
 
-A historical SHIP result describes the tested observation window; it does not guarantee future provider behavior. Later operational HOLD evidence does not retroactively falsify the historical measurement, but it **does block broader maturity claims** until the regression is understood and requalified under a versioned configuration.
+A historical SHIP result describes its tested observation window; it does not guarantee future provider behavior. The earlier HOLD remains evidence of a real observed fallback failure. Phase 1.8.2 is a new versioned configuration and qualification epoch rather than a rewrite of that history.
 
-No human labels are fabricated, no failed operational evidence is discarded, no SLO is weakened, and no paid dedicated infrastructure is provisioned implicitly.
+No human labels are fabricated, failed operational evidence is not discarded, SLOs are not weakened, and no paid dedicated infrastructure is provisioned implicitly.

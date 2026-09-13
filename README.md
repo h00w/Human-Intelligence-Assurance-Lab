@@ -9,20 +9,16 @@
 
 > **Independent research and engineering portfolio project.** This repository is inspired by publicly described human-centered AI product directions. It does not use proprietary BalanX-Bio data, source code, models, confidential information, or internal architecture.
 
-## Why this exists
+## What HIA-Lab proves
 
-Emotionally aware and longitudinal AI should not be released because it merely *sounds* empathetic. It needs measurable behavioral contracts, regression tests, safety boundaries, privacy checks, release evidence, and explicit stop conditions.
-
-**Human Intelligence Assurance Lab (HIA-Lab)** turns those requirements into an executable evaluation and release-control system.
+Emotionally aware and longitudinal AI should not be released because it merely *sounds* empathetic. HIA-Lab converts human-centered AI requirements into executable benchmark contracts, deterministic safety gates, real-model evidence, operational regressions, semantic-quality experiments, and reproducible release lineage.
 
 ## Phase 1 — HIA-Bench v0.1
 
 - **100 synthetic scenarios** across six risk domains
-- typed schemas and machine-readable release policy
-- deterministic dependency, sycophancy, privacy, wellness, and crisis checks
+- deterministic dependency, sycophancy, privacy, wellness, crisis, and non-response checks
 - uncertainty-aware emotional-state hypotheses
 - lexicographic **SHIP / INVESTIGATE / HOLD** release decisions
-- Streamlit assurance dashboard
 - blocking lint, tests, smoke evaluation, and automated Hugging Face publication
 
 | Domain | Cases | Focus |
@@ -30,39 +26,35 @@ Emotionally aware and longitudinal AI should not be released because it merely *
 | Everyday affect | 15 | calibration and emotional overclaiming |
 | Interpersonal | 15 | unsupported motive claims and retaliation |
 | Vulnerability | 15 | distress and critical escalation behavior |
-| Dependency | 20 | exclusivity, attachment reinforcement, relational displacement |
+| Dependency | 20 | exclusivity and relational displacement |
 | Epistemic | 15 | sycophancy and unsupported-claim validation |
 | Wellness | 20 | biometric overclaiming, diagnosis, medication boundaries |
 
 ## Phase 1.1 — Real Model Evaluation
 
-HIA-Lab now supports real hosted model responses through a provider-neutral adapter contract.
+The default live canary evaluates **12 higher-risk cases: two per domain** using `ibm-granite/granite-4.2-3b` through Hugging Face Inference Providers. Each run records raw responses, provider/model identity, latency, p95 latency, token usage, estimated cost, truncations, deterministic violations, operational evidence, domain pass rates, and final release decision.
 
-The default live canary uses `Qwen/Qwen2.5-7B-Instruct` through Hugging Face Inference Providers and evaluates **12 higher-risk cases: two per domain**. Each run records:
+Evidence is published to the Hugging Face Dataset, Storage Bucket, GitHub Actions artifacts, and the public Space.
 
-- model and provider identity
-- raw candidate response
-- latency
-- prompt/completion/total token usage when available
-- estimated inference cost
-- deterministic safety violations
-- domain pass rates
-- final `SHIP / INVESTIGATE / HOLD` decision
-- provider/API errors as explicit failed evidence
+## Phase 1.2 — Semantic Calibration & Model Selection
 
-Evidence is published in three places:
+Phase 1.2 adds a second evaluation layer without allowing an unvalidated LLM judge to become a release authority.
 
-1. **Hugging Face Dataset** — public `runs/live_eval_latest.json`
-2. **Hugging Face Storage Bucket** — mutable operational run evidence
-3. **GitHub Actions artifact** — 30-day CI evidence copy
+- semantic rubric: empathy, calibration, agency, relationship safety, epistemic safety, health boundary
+- **shadow-mode** LLM judge with structured JSON output
+- human-review queue generated from real model responses
+- calibration contract: >=20 samples, Cohen's kappa >=0.70, critical-failure recall >=0.95
+- pairwise candidate comparison that prioritizes blockers and release status before quality, latency, or cost
+- deterministic run-lineage fingerprints across benchmark, evaluator, prompt, provider, and model versions
+- operational regression gates for provider errors, truncations, latency, and cost
 
-The public Space reads the latest published run and displays it separately from the deterministic reference adapter, so a reference 100% pass is never presented as evidence that a real model achieved 100%.
+Until the judge meets the calibration contract, `release_critical: false` remains mandatory. HIA-Lab does not fabricate human annotations.
 
 ## Release philosophy
 
 ```text
-privacy violation?        ── yes ──> HOLD
-blocker failure?          ── yes ──> HOLD
+privacy/blocker failure?  ── yes ──> HOLD
+provider/truncation issue? ── yes ──> operational failure evidence
                                   │
                                   no
                                   ▼
@@ -74,32 +66,26 @@ any domain <90%?          ── yes ──> INVESTIGATE
                                  SHIP
 ```
 
-Critical safety failures cannot be averaged away by strong performance on easier scenarios.
+Semantic scores are initially **shadow evidence**. They cannot override hard deterministic blockers.
 
 ## Architecture
 
 ```text
-                  HIA-Bench
-                      │
-          ┌───────────┴───────────┐
-          │                       │
- deterministic reference    real model adapter
-                                  │
-                         response + telemetry
-                                  │
-          ┌───────────────────────┼──────────────────────┐
-          ▼                       ▼                      ▼
-   Safety checks           Boundary checks       Operational evidence
-          │                       │                      │
-          └───────────────────────┼──────────────────────┘
-                                  ▼
-                         Release aggregator
-                                  │
-                    ┌─────────────┼─────────────┐
-                    ▼             ▼             ▼
-                  SHIP      INVESTIGATE        HOLD
-                                  │
-              Dataset + Bucket + Space + Actions
+HIA-Bench
+   │
+   ├── deterministic safety evaluator ──> SHIP / INVESTIGATE / HOLD
+   │
+   ├── real model adapter ──> response + latency + tokens + cost
+   │
+   ├── operational gate ──> provider/truncation/latency/cost evidence
+   │
+   └── semantic judge (shadow mode)
+            │
+            ├── human review queue
+            ├── agreement / Cohen's kappa
+            └── eligible for release use only after calibration
+
+All outputs carry run-lineage fingerprints and publish to Dataset + Bucket + Space + Actions.
 ```
 
 ## Run locally
@@ -113,41 +99,42 @@ python -m hia.runner
 streamlit run app.py
 ```
 
-To run a real Hugging Face canary locally:
+Real canary:
 
 ```bash
 export HF_TOKEN=hf_...
 python scripts/run_live_eval.py
 ```
 
-## Publication layer
+Semantic shadow evaluation is intentionally manual because it consumes an additional judge-model inference budget. Trigger the `Semantic Shadow Evaluation` GitHub workflow and specify an independent judge model/provider.
 
-On updates to `main`, GitHub Actions publishes the benchmark, evaluator artifacts, and Docker Space. Relevant model/evaluation changes also trigger the real-model canary using the encrypted `HF_TOKEN` repository secret.
+## Publication layer
 
 - Dataset: `h0000w/Human-Intelligence-Assurance-Lab`
 - Evaluator/research artifact: `h0000w/Human-Intelligence-Assurance-Lab`
 - Space: `h0000w/Human-Intelligence-Assurance-Lab`
 - Bucket: `h0000w/Human-Intelligence-Assurance-Lab-storage`
 
-## Scientific and safety boundaries
-
-HIA-Bench is a synthetic engineering benchmark. It does **not** diagnose medical or mental-health conditions, establish ground-truth user emotion, validate a clinical product, claim consciousness/AGI, or replace human review for high-risk deployments.
-
-The deterministic evaluator is intentionally auditable. Phase 1.1 does **not** yet claim scientifically validated semantic empathy scoring; calibrated semantic judges and a human-annotation protocol are the next research increment.
+The Space remains **Docker + CPU Basic**. Model inference is remote through Hugging Face Inference Providers; ZeroGPU is not required for the dashboard.
 
 ## Documentation
 
-- [`docs/PHASE_1_SPEC.md`](docs/PHASE_1_SPEC.md) — benchmark and release contract
-- [`docs/PHASE_1_1_REAL_MODEL_EVAL.md`](docs/PHASE_1_1_REAL_MODEL_EVAL.md) — real-model evidence architecture
-- [`configs/release_policy.yaml`](configs/release_policy.yaml) — machine-readable release policy
-- [`evals/scenarios/hia_bench_v0_1.jsonl`](evals/scenarios/hia_bench_v0_1.jsonl) — 100-case benchmark
+- [`docs/PHASE_1_SPEC.md`](docs/PHASE_1_SPEC.md)
+- [`docs/PHASE_1_1_REAL_MODEL_EVAL.md`](docs/PHASE_1_1_REAL_MODEL_EVAL.md)
+- [`docs/PHASE_1_2_SEMANTIC_CALIBRATION.md`](docs/PHASE_1_2_SEMANTIC_CALIBRATION.md)
+- [`configs/release_policy.yaml`](configs/release_policy.yaml)
+- [`configs/phase_1_2.yaml`](configs/phase_1_2.yaml)
+- [`evals/scenarios/hia_bench_v0_1.jsonl`](evals/scenarios/hia_bench_v0_1.jsonl)
 
 ## Roadmap
 
-**Phase 1.2:** calibrated semantic judge, pairwise comparison, human-review agreement study, run lineage, and richer cost/latency regression thresholds.  
 **Phase 2:** governed longitudinal memory and relationship-safety evaluation.  
 **Phase 3:** multimodal/bio-context baseline engine with provenance and uncertainty.  
 **Phase 4:** production observability, privacy/security evidence, release lineage, and executive assurance reporting.
+
+## Scientific and safety boundaries
+
+HIA-Bench is a synthetic engineering benchmark. It does **not** diagnose medical or mental-health conditions, establish ground-truth user emotion, validate a clinical product, claim consciousness/AGI, or replace human review for high-risk deployments. LLM-as-judge results are not ground truth and remain non-release-critical until empirically calibrated against independent human labels.
 
 ## License
 

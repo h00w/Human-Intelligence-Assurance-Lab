@@ -30,6 +30,7 @@ def _load_dataset_json(filename: str):
 
 
 live = _load_dataset_json("runs/live_eval_latest.json")
+bakeoff = _load_dataset_json("runs/model_bakeoff_latest.json")
 semantic = _load_dataset_json("runs/semantic_shadow_latest.json")
 
 if live:
@@ -45,7 +46,10 @@ if live:
     c5.metric("Est. run cost", f"${cost:.5f}" if cost is not None else "n/a")
 
     if live.get("lineage"):
-        st.caption(f"Run lineage: `{live['lineage']['fingerprint']}` · evaluator {live['lineage']['evaluator_version']} · prompt {live['lineage']['prompt_version']}")
+        st.caption(
+            f"Run lineage: `{live['lineage']['fingerprint']}` · evaluator "
+            f"{live['lineage']['evaluator_version']} · prompt {live['lineage']['prompt_version']}"
+        )
 
     operational = live.get("operational_report")
     if operational:
@@ -82,6 +86,47 @@ if live:
 else:
     st.info("No published real-model run yet. The deterministic reference benchmark remains available below.")
 
+st.subheader("Phase 1.2.1 live model bakeoff")
+if bakeoff:
+    baseline = bakeoff["baseline"]
+    candidate = bakeoff["candidate"]
+    comparison = bakeoff["comparison"]
+    b_run, b_release = baseline["run"], baseline["release_report"]
+    c_run, c_release = candidate["run"], candidate["release_report"]
+
+    st.markdown(f"**Safety-first winner:** `{comparison['winner']}` — {'; '.join(comparison['rationale'])}")
+    compare_df = pd.DataFrame(
+        [
+            {
+                "role": "baseline",
+                "model": b_run["model"],
+                "decision": b_release["decision"],
+                "pass_rate": b_release["pass_rate"],
+                "blockers": b_release["blocker_failures"],
+                "truncations": b_run.get("completion_truncations", 0),
+                "mean_latency_ms": b_run.get("mean_latency_ms"),
+                "p95_latency_ms": b_run.get("p95_latency_ms"),
+            },
+            {
+                "role": "candidate",
+                "model": c_run["model"],
+                "decision": c_release["decision"],
+                "pass_rate": c_release["pass_rate"],
+                "blockers": c_release["blocker_failures"],
+                "truncations": c_run.get("completion_truncations", 0),
+                "mean_latency_ms": c_run.get("mean_latency_ms"),
+                "p95_latency_ms": c_run.get("p95_latency_ms"),
+            },
+        ]
+    )
+    st.dataframe(compare_df, use_container_width=True, hide_index=True)
+    st.caption(
+        "Comparison is lexicographic: blocker failures and release status dominate quality, latency, and cost. "
+        "Semantic scores are excluded until human calibration requirements are met."
+    )
+else:
+    st.info("No two-model bakeoff has been published yet.")
+
 st.subheader("Phase 1.2 semantic quality calibration")
 if semantic:
     calibration = semantic.get("calibration", {})
@@ -91,7 +136,8 @@ if semantic:
     s2.metric("Judge model", semantic.get("judge_model", "n/a"))
     s3.metric("Calibration", calibration.get("status", "UNKNOWN"))
     st.warning(
-        "Semantic judge results are shadow evidence and are not release-critical until independent human-review calibration meets the configured agreement thresholds."
+        "Semantic judge results are shadow evidence and are not release-critical until independent "
+        "human-review calibration meets the configured agreement thresholds."
     )
     if scores:
         semantic_rows = pd.DataFrame(
@@ -110,7 +156,8 @@ if semantic:
         st.dataframe(semantic_rows, use_container_width=True, hide_index=True)
 else:
     st.info(
-        "Semantic judge has not been run yet. Trigger the manual Semantic Shadow Evaluation workflow with an independent judge model; HIA-Lab will generate both semantic evidence and a human-review queue."
+        "Semantic judge has not been run yet. Trigger the manual Semantic Shadow Evaluation workflow with "
+        "an independent judge model; HIA-Lab will generate semantic evidence and a human-review queue."
     )
 
 st.subheader("Deterministic reference adapter")
@@ -154,5 +201,7 @@ for scenario in scenarios:
 st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
 
 st.info(
-    "HIA-Bench uses synthetic scenarios and auditable checks. Emotional-state fields are hypotheses, not clinical labels or ground truth. Live model and semantic-judge results are evidence for this benchmark only."
+    "HIA-Bench uses synthetic scenarios and auditable checks. Emotional-state fields are hypotheses, "
+    "not clinical labels or ground truth. Live model and semantic-judge results are evidence for this "
+    "benchmark only."
 )

@@ -20,6 +20,7 @@ class HuggingFaceAdapter(ModelAdapter):
         max_tokens: int = 1024,
         temperature: float = 1.0,
         top_p: float = 0.95,
+        timeout_s: float | None = None,
         input_price_per_million: float | None = 0.03,
         output_price_per_million: float | None = 0.12,
     ) -> None:
@@ -28,12 +29,13 @@ class HuggingFaceAdapter(ModelAdapter):
         self.max_tokens = max_tokens
         self.temperature = temperature
         self.top_p = top_p
+        self.timeout_s = timeout_s
         self.input_price_per_million = input_price_per_million
         self.output_price_per_million = output_price_per_million
         api_key = token or os.getenv("HF_TOKEN")
         if not api_key:
             raise RuntimeError("HF_TOKEN is required for Hugging Face routed inference")
-        self.client = InferenceClient(provider=provider, api_key=api_key)
+        self.client = InferenceClient(provider=provider, api_key=api_key, timeout=timeout_s)
 
     def generate(self, *, system_prompt: str, user_prompt: str) -> GenerationResult:
         started = time.perf_counter()
@@ -82,5 +84,6 @@ class HuggingFaceAdapter(ModelAdapter):
                 "max_tokens": self.max_tokens,
                 "temperature": self.temperature,
                 "top_p": self.top_p,
+                "timeout_s": self.timeout_s,
             },
         )

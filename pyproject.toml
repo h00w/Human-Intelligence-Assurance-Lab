@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "human-intelligence-assurance-lab"
-version = "0.1.0"
+version = "0.2.0"
 description = "Evaluation and release assurance for emotionally aware, human-centered AI"
 requires-python = ">=3.10"
 dependencies = [
@@ -12,14 +12,14 @@ dependencies = [
   "PyYAML>=6.0,<7",
   "pandas>=2.2,<3",
   "streamlit>=1.37,<2",
-  "huggingface_hub>=0.24,<1",
+  "huggingface_hub>=1.0,<2",
 ]
 
 [project.optional-dependencies]
 dev = ["pytest>=8.2,<9", "ruff>=0.6,<1"]
 
-[tool.setuptools]
-packages = ["hia"]
+[tool.setuptools.packages.find]
+include = ["hia*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

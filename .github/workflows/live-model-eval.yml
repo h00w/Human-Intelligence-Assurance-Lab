@@ -1,0 +1,46 @@
+name: Live Model Evaluation
+
+on:
+  workflow_dispatch:
+    inputs:
+      model:
+        description: Hugging Face model id
+        required: false
+        default: Qwen/Qwen2.5-7B-Instruct
+      per_domain:
+        description: Canary cases per domain
+        required: false
+        default: '2'
+  push:
+    branches: [main]
+    paths:
+      - 'hia/**'
+      - 'evals/**'
+      - 'scripts/run_live_eval.py'
+      - '.github/workflows/live-model-eval.yml'
+
+jobs:
+  evaluate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      HIA_MODEL: ${{ inputs.model || 'Qwen/Qwen2.5-7B-Instruct' }}
+      HIA_CANARY_PER_DOMAIN: ${{ inputs.per_domain || '2' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install
+        run: pip install -e .
+      - name: Run real-model canary
+        run: python scripts/run_live_eval.py
+      - name: Upload evidence artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: hia-live-eval
+          path: artifacts/live_eval_latest.json
+          retention-days: 30

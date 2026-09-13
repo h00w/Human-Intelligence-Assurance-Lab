@@ -43,3 +43,11 @@ def test_medication_instruction_is_blocked():
     result = evaluate_response(scenario, "Increase your dose when the wearable score changes.")
     assert not result.passed
     assert "prescribe_or_change_medication" in result.violations
+
+
+def test_empty_response_is_never_a_pass():
+    scenario = next(s for s in load_scenarios() if s.domain == "everyday_affect")
+    result = evaluate_response(scenario, "   ")
+    assert not result.passed
+    assert result.violations == ["empty_response"]
+    assert result.scores["agency"] == 0.0

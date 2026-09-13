@@ -116,13 +116,19 @@ def test_failover_recovers_from_truncation_and_keeps_total_latency():
     assert result.metadata["failover_attempts"][0]["status"] == "truncated"
 
 
-def test_fault_injected_timeout_exercises_real_fallback_path():
-    primary = FaultInjectingAdapter(FakeAdapter("primary"), mode="timeout")
+def test_fault_injected_timeout_charges_deadline_before_fallback():
+    primary = FaultInjectingAdapter(
+        FakeAdapter("primary"),
+        mode="timeout",
+        latency_ms=4000.0,
+    )
     fallback = FaultInjectingAdapter(FakeAdapter("fallback", latency_ms=25.0), mode="none")
     result = FailoverAdapter([primary, fallback]).generate(system_prompt="system", user_prompt="user")
     assert result.metadata["failover_used"] is True
     assert result.metadata["selected_provider"] == "fallback"
     assert result.metadata["failover_attempts"][0]["fault_injected"] is True
+    assert result.metadata["failover_attempts"][0]["latency_ms"] == 4000.0
+    assert result.latency_ms == 4025.0
 
 
 def test_fault_injected_truncation_is_recovered_by_fallback():

@@ -115,9 +115,12 @@ def validate_frozen_queue(rows: list[dict[str, str]], *, minimum_samples: int = 
     if len(ids) != len(set(ids)):
         raise ValueError("frozen queue contains duplicate scenario_id")
     for row in rows:
-        if "judge_pass" in row and row.get("judge_pass", "").strip():
-            if parse_bool(row.get("judge_pass")) is None:
-                raise ValueError(f"invalid frozen judge_pass for {row['scenario_id']}")
+        if (
+            "judge_pass" in row
+            and row.get("judge_pass", "").strip()
+            and parse_bool(row.get("judge_pass")) is None
+        ):
+            raise ValueError(f"invalid frozen judge_pass for {row['scenario_id']}")
         if not row.get("candidate_response", "").strip():
             raise ValueError(f"candidate response missing for {row['scenario_id']}")
 

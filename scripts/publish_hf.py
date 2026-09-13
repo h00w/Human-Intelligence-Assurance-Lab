@@ -63,4 +63,10 @@ api.upload_folder(
     repo_id=space_repo,
     repo_type="space",
 )
-print("Published HIA-Bench dataset, evaluator artifact repo, and CPU Basic Docker Space.")
+api.upload_folder(
+    folder_path=str(root / "pages"),
+    path_in_repo="pages",
+    repo_id=space_repo,
+    repo_type="space",
+)
+print("Published HIA-Bench dataset, evaluator artifact repo, and CPU Basic multipage Docker Space.")

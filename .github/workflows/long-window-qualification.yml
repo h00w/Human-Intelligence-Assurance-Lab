@@ -9,6 +9,7 @@ on:
     paths:
       - 'hia/drift.py'
       - 'scripts/run_long_window_qualification.py'
+      - 'scripts/generate_v1_readiness_manifest.py'
       - '.github/workflows/long-window-qualification.yml'
 
 jobs:
@@ -35,9 +36,13 @@ jobs:
         run: python scripts/run_adaptive_hedging.py
       - name: Archive time-separated evidence
         run: python scripts/run_long_window_qualification.py
+      - name: Refresh Phase 1 v1 readiness manifest
+        run: python scripts/generate_v1_readiness_manifest.py
       - name: Upload long-window evidence
         uses: actions/upload-artifact@v4
         with:
           name: hia-long-window-qualification
-          path: artifacts/long_window_report.json
+          path: |
+            artifacts/long_window_report.json
+            artifacts/phase_1_v1_readiness.json
           retention-days: 30

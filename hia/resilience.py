@@ -79,6 +79,52 @@ def select_provider(reports: dict[str, dict], *, p95_slo_ms: float = 8000.0) -> 
     )
 
 
+class FaultInjectedError(RuntimeError):
+    """Explicit synthetic infrastructure fault used only by qualification experiments."""
+
+
+class FaultInjectingAdapter(ModelAdapter):
+    """Wrap a real adapter and deterministically inject timeout/error/truncation faults.
+
+    Faults are labeled in metadata so injected failures cannot be confused with naturally
+    occurring provider failures. Non-faulted calls still execute the real provider route.
+    """
+
+    def __init__(self, adapter: ModelAdapter, *, mode: str = "none", latency_ms: float = 0.0) -> None:
+        if mode not in {"none", "timeout", "error", "truncation"}:
+            raise ValueError(f"unsupported fault mode: {mode}")
+        self.adapter = adapter
+        self.mode = mode
+        self.injected_latency_ms = latency_ms
+        self.provider = getattr(adapter, "provider", "fault-injection")
+        self.routing_provider = getattr(adapter, "routing_provider", self.provider)
+        self.model = adapter.model
+
+    def generate(self, *, system_prompt: str, user_prompt: str) -> GenerationResult:
+        if self.mode == "timeout":
+            raise TimeoutError(f"injected timeout for {self.routing_provider}")
+        if self.mode == "error":
+            raise FaultInjectedError(f"injected provider error for {self.routing_provider}")
+
+        result = self.adapter.generate(system_prompt=system_prompt, user_prompt=user_prompt)
+        if self.mode != "truncation":
+            return result
+
+        metadata = dict(result.metadata)
+        metadata.update({"finish_reason": "length", "fault_injected": True, "fault_mode": "truncation"})
+        return GenerationResult(
+            provider=result.provider,
+            model=result.model,
+            text=result.text,
+            latency_ms=round(result.latency_ms + self.injected_latency_ms, 2),
+            prompt_tokens=result.prompt_tokens,
+            completion_tokens=result.completion_tokens,
+            total_tokens=result.total_tokens,
+            estimated_cost_usd=result.estimated_cost_usd,
+            metadata=metadata,
+        )
+
+
 class FailoverAdapter(ModelAdapter):
     """Try ordered provider adapters, failing over on timeout/error/truncation.
 
@@ -110,10 +156,11 @@ class FailoverAdapter(ModelAdapter):
                 attempts.append(
                     {
                         "attempt": index + 1,
-                        "provider": result.metadata.get("routing_provider", adapter.provider),
+                        "provider": result.metadata.get("routing_provider", getattr(adapter, "routing_provider", adapter.provider)),
                         "latency_ms": result.latency_ms,
                         "finish_reason": finish_reason,
                         "status": "truncated" if finish_reason == "length" else "success",
+                        "fault_injected": bool(result.metadata.get("fault_injected")),
                     }
                 )
                 if finish_reason != "length":
@@ -122,7 +169,7 @@ class FailoverAdapter(ModelAdapter):
                         {
                             "failover_attempts": attempts,
                             "selected_provider": result.metadata.get(
-                                "routing_provider", adapter.provider
+                                "routing_provider", getattr(adapter, "routing_provider", adapter.provider)
                             ),
                             "failover_used": index > 0,
                         }
@@ -146,6 +193,7 @@ class FailoverAdapter(ModelAdapter):
                         "provider": getattr(adapter, "routing_provider", adapter.provider),
                         "status": "error",
                         "error_type": type(exc).__name__,
+                        "fault_injected": isinstance(exc, (FaultInjectedError, TimeoutError)),
                     }
                 )
 

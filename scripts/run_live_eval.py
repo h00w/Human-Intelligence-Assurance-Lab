@@ -17,10 +17,14 @@ BUCKET = "h0000w/Human-Intelligence-Assurance-Lab-storage"
 
 
 def main() -> None:
-    model = os.getenv("HIA_MODEL", "Qwen/Qwen2.5-7B-Instruct")
+    model = os.getenv("HIA_MODEL", "ibm-granite/granite-4.2-3b")
+    provider = os.getenv("HIA_PROVIDER", "deepinfra")
     per_domain = int(os.getenv("HIA_CANARY_PER_DOMAIN", "2"))
     scenarios = select_canary(load_scenarios(), per_domain=per_domain)
-    report = run_model_evaluation(HuggingFaceAdapter(model=model), scenarios)
+    report = run_model_evaluation(
+        HuggingFaceAdapter(model=model, provider=provider),
+        scenarios,
+    )
 
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")

@@ -14,6 +14,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "artifacts" / "adaptive_hedging_latest.json"
 OUT = ROOT / "artifacts" / "long_window_report.json"
 DATASET_REPO = "h0000w/Human-Intelligence-Assurance-Lab"
+ADAPTIVE_LATEST = "runs/adaptive_hedging_latest.json"
 PREFIX = "runs/long_window/"
 
 
@@ -50,12 +51,17 @@ def snapshot_from_payload(payload: dict, timestamp: datetime) -> QualificationSn
     )
 
 
+def load_current_payload(token: str | None) -> dict:
+    if SOURCE.exists():
+        return json.loads(SOURCE.read_text(encoding="utf-8"))
+    local = hf_hub_download(DATASET_REPO, ADAPTIVE_LATEST, repo_type="dataset", token=token)
+    return json.loads(Path(local).read_text(encoding="utf-8"))
+
+
 def main() -> None:
-    if not SOURCE.exists():
-        raise SystemExit("adaptive evidence missing; run scripts/run_adaptive_hedging.py first")
     token = os.getenv("HF_TOKEN")
     now = datetime.now(timezone.utc)
-    current_payload = json.loads(SOURCE.read_text(encoding="utf-8"))
+    current_payload = load_current_payload(token)
     current = snapshot_from_payload(current_payload, now)
     snapshots = [current]
 

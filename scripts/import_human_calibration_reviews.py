@@ -43,7 +43,8 @@ def main() -> None:
     adjudication_path = args.out / "adjudication_queue.csv"
     adjudication_path.write_bytes(csv_bytes(result.adjudication_rows, ADJUDICATION_FIELDS))
 
-    status = "READY_FOR_SCORING"
+    judge_present = all(row.get("judge_pass", "").strip() for row in frozen)
+    status = "READY_FOR_SCORING" if judge_present else "READY_FOR_POST_REVIEW_JUDGE"
     if result.disagreement_count:
         if args.adjudication is None:
             status = "ADJUDICATION_REQUIRED"
@@ -53,15 +54,19 @@ def main() -> None:
     merged_path = args.out / "merged_human_labels.csv"
     merged_path.write_bytes(csv_bytes(merged_rows, MERGED_FIELDS))
     manifest = {
-        "schema_version": "1.0",
+        "schema_version": "1.1",
         "frozen_queue_sha256": queue_fingerprint(frozen),
         "reviewers": list(result.reviewer_ids),
         "sample_count": result.sample_count,
         "disagreement_count": result.disagreement_count,
+        "judge_labels_present": judge_present,
         "status": status,
         "merged_labels": str(merged_path),
         "adjudication_queue": str(adjudication_path),
-        "note": "Original reviewer labels are preserved. Disagreements require explicit adjudication before release-critical scoring.",
+        "note": (
+            "Original reviewer labels are preserved. Disagreements require explicit adjudication. "
+            "When the frozen batch has no judge labels, semantic-judge scoring happens only after human review."
+        ),
     }
     (args.out / "import_manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
     print(json.dumps(manifest, indent=2))

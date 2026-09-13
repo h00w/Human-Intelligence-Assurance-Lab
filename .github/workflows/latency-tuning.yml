@@ -1,0 +1,44 @@
+name: Phase 1.3 Latency Tuning
+
+on:
+  workflow_dispatch:
+    inputs:
+      model:
+        description: Hugging Face model id
+        required: false
+        default: meta-llama/Llama-3.1-8B-Instruct
+      provider:
+        description: Hugging Face inference provider
+        required: false
+        default: deepinfra
+      per_domain:
+        description: Canary cases per domain
+        required: false
+        default: '2'
+
+jobs:
+  tune:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      HIA_LATENCY_MODEL: ${{ inputs.model || 'meta-llama/Llama-3.1-8B-Instruct' }}
+      HIA_LATENCY_PROVIDER: ${{ inputs.provider || 'deepinfra' }}
+      HIA_CANARY_PER_DOMAIN: ${{ inputs.per_domain || '2' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install
+        run: pip install -e .
+      - name: Run latency tuning experiment
+        run: python scripts/run_latency_tuning.py
+      - name: Upload evidence artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: hia-latency-tuning
+          path: artifacts/latency_tuning_latest.json
+          retention-days: 30

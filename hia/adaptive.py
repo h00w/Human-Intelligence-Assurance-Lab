@@ -34,7 +34,7 @@ class AdaptiveHedgePolicy:
         *,
         min_delay_ms: float = 500.0,
         max_delay_ms: float = 2500.0,
-    ) -> "AdaptiveHedgePolicy":
+    ) -> AdaptiveHedgePolicy:
         if len(latencies_ms) < 4:
             raise ValueError("adaptive hedge policy requires at least four latency samples")
         values = sorted(float(value) for value in latencies_ms)
@@ -54,9 +54,6 @@ class AdaptiveHedgePolicy:
         def bounded(value: float) -> float:
             return round(max(min_delay_ms, min(max_delay_ms, value)), 2)
 
-        # High-risk traffic hedges earlier; ordinary traffic accepts more primary-route
-        # variance to reduce duplicate inference. Every delay is derived from the same
-        # measured primary latency distribution rather than a hand-picked fixed constant.
         delays = {
             "critical": bounded(profile.p50_ms),
             "high": bounded(profile.p75_ms),
@@ -75,12 +72,7 @@ class AdaptiveHedgePolicy:
 
 
 class AdaptiveHedgedAdapter(ModelAdapter):
-    """Risk-aware hedging using delays derived from measured primary latency.
-
-    ``risk_by_prompt`` is intentionally explicit: the evaluation harness owns the
-    scenario-to-risk mapping, while the adapter only receives the user prompt through
-    the existing ModelAdapter interface. Unknown prompts use the medium-risk delay.
-    """
+    """Risk-aware hedging using delays derived from measured primary latency."""
 
     provider = "adaptive-hedged"
 
@@ -198,8 +190,7 @@ def cohort_metrics(report: dict[str, Any]) -> dict[str, dict[str, Any]]:
             for row in rows
             if row.get("error") is None
         ]
-        synthetic_report = {"evidence": rows}
-        economics = routing_economics(synthetic_report)
+        economics = routing_economics({"evidence": rows})
         passed = sum(bool(row.get("evaluation", {}).get("passed")) for row in rows)
         output[risk] = {
             "scenario_count": len(rows),

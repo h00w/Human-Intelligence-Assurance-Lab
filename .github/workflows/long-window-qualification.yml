@@ -1,0 +1,37 @@
+name: Long-Window Qualification
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '15 3 * * 0'
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      HIA_ADAPTIVE_MODEL: meta-llama/Llama-3.1-8B-Instruct
+      HIA_ADAPTIVE_PRIMARY: nscale
+      HIA_ADAPTIVE_FALLBACK: novita
+      HIA_ADAPTIVE_TRIALS: '5'
+      HIA_ADAPTIVE_FAULT_TRIALS: '3'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install
+        run: pip install -e .
+      - name: Run fresh adaptive qualification
+        run: python scripts/run_adaptive_hedging.py
+      - name: Archive time-separated evidence
+        run: python scripts/run_long_window_qualification.py
+      - name: Upload long-window evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: hia-long-window-qualification
+          path: artifacts/long_window_report.json
+          retention-days: 30

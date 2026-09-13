@@ -15,16 +15,22 @@ st.caption("HIA-Bench v0.1 · Emotional Intelligence Assurance & Release Gate")
 
 scenarios, results, report = run_demo()
 
-try:
-    live_path = hf_hub_download(
-        repo_id="h0000w/Human-Intelligence-Assurance-Lab",
-        repo_type="dataset",
-        filename="runs/live_eval_latest.json",
-    )
-    with open(live_path, encoding="utf-8") as handle:
-        live = json.load(handle)
-except (OSError, ValueError, HfHubHTTPError):
-    live = None
+
+def _load_dataset_json(filename: str):
+    try:
+        path = hf_hub_download(
+            repo_id="h0000w/Human-Intelligence-Assurance-Lab",
+            repo_type="dataset",
+            filename=filename,
+        )
+        with open(path, encoding="utf-8") as handle:
+            return json.load(handle)
+    except (OSError, ValueError, HfHubHTTPError):
+        return None
+
+
+live = _load_dataset_json("runs/live_eval_latest.json")
+semantic = _load_dataset_json("runs/semantic_shadow_latest.json")
 
 if live:
     st.subheader("Latest real-model canary")
@@ -37,6 +43,21 @@ if live:
     c4.metric("Mean latency", f"{run['mean_latency_ms']:.0f} ms" if run["mean_latency_ms"] else "n/a")
     cost = run.get("estimated_cost_usd")
     c5.metric("Est. run cost", f"${cost:.5f}" if cost is not None else "n/a")
+
+    if live.get("lineage"):
+        st.caption(f"Run lineage: `{live['lineage']['fingerprint']}` · evaluator {live['lineage']['evaluator_version']} · prompt {live['lineage']['prompt_version']}")
+
+    operational = live.get("operational_report")
+    if operational:
+        if operational["passed"]:
+            st.success("Operational regression gate passed.")
+        else:
+            st.warning("Operational regression evidence: " + "; ".join(operational["reasons"]))
+        o1, o2, o3 = st.columns(3)
+        p95 = run.get("p95_latency_ms")
+        o1.metric("p95 latency", f"{p95:.0f} ms" if p95 is not None else "n/a")
+        o2.metric("Provider errors", run.get("provider_errors", 0))
+        o3.metric("Truncations", run.get("completion_truncations", 0))
 
     live_domains = pd.DataFrame(
         [{"domain": key, "pass_rate": value} for key, value in release["domain_pass_rates"].items()]
@@ -60,6 +81,37 @@ if live:
         st.dataframe(pd.DataFrame(evidence_rows), use_container_width=True, hide_index=True)
 else:
     st.info("No published real-model run yet. The deterministic reference benchmark remains available below.")
+
+st.subheader("Phase 1.2 semantic quality calibration")
+if semantic:
+    calibration = semantic.get("calibration", {})
+    scores = semantic.get("scores", [])
+    s1, s2, s3 = st.columns(3)
+    s1.metric("Judge mode", semantic.get("mode", "shadow").upper())
+    s2.metric("Judge model", semantic.get("judge_model", "n/a"))
+    s3.metric("Calibration", calibration.get("status", "UNKNOWN"))
+    st.warning(
+        "Semantic judge results are shadow evidence and are not release-critical until independent human-review calibration meets the configured agreement thresholds."
+    )
+    if scores:
+        semantic_rows = pd.DataFrame(
+            [
+                {
+                    "scenario": row["scenario_id"],
+                    "domain": row["domain"],
+                    "risk": row["risk_level"],
+                    "overall": row["semantic"]["overall"],
+                    "judge_pass": row["semantic"]["pass_label"],
+                    "rationale": row["semantic"]["rationale"],
+                }
+                for row in scores
+            ]
+        )
+        st.dataframe(semantic_rows, use_container_width=True, hide_index=True)
+else:
+    st.info(
+        "Semantic judge has not been run yet. Trigger the manual Semantic Shadow Evaluation workflow with an independent judge model; HIA-Lab will generate both semantic evidence and a human-review queue."
+    )
 
 st.subheader("Deterministic reference adapter")
 c1, c2, c3, c4 = st.columns(4)
@@ -102,6 +154,5 @@ for scenario in scenarios:
 st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
 
 st.info(
-    "HIA-Bench uses synthetic scenarios and auditable checks. Emotional-state fields are hypotheses, "
-    "not clinical labels or ground truth. Live model results are evidence for this benchmark only."
+    "HIA-Bench uses synthetic scenarios and auditable checks. Emotional-state fields are hypotheses, not clinical labels or ground truth. Live model and semantic-judge results are evidence for this benchmark only."
 )

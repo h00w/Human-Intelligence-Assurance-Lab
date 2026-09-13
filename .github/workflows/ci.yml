@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main, phase-1-hia-bench]
+    branches: [main]
   pull_request:
 
 jobs:
@@ -19,7 +19,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e '.[dev]'
       - name: Lint
-        run: ruff check hia tests app.py scripts || true
+        run: ruff check hia tests app.py scripts
       - name: Tests
         run: pytest -q
       - name: Smoke benchmark

@@ -1,0 +1,8 @@
+{
+  "phase": "1.8",
+  "title": "Adaptive Hedging & Cost-Aware Routing",
+  "authoritative_verdict": "SHIP",
+  "evidence_path": "runs/adaptive_hedging_latest.json",
+  "dedicated_endpoint": "NOT_CONFIGURED",
+  "dedicated_release_critical": false
+}

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
+
 from .schema import EvaluationResult, ReleaseReport, Scenario
 
 

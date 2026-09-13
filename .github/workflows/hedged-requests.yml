@@ -1,0 +1,63 @@
+name: Phase 1.7 Hedged Requests
+
+on:
+  workflow_dispatch:
+    inputs:
+      model:
+        description: Candidate model
+        required: false
+        default: meta-llama/Llama-3.1-8B-Instruct
+      primary:
+        description: Primary HF inference provider
+        required: false
+        default: nscale
+      fallback:
+        description: Fallback HF inference provider
+        required: false
+        default: novita
+      thresholds_ms:
+        description: Comma-separated hedge thresholds in milliseconds
+        required: false
+        default: 500,1000,1500,2000
+      repeated_trials:
+        description: Repeated qualification trials
+        required: false
+        default: "10"
+  push:
+    branches: [main]
+    paths:
+      - "hia/resilience.py"
+      - "scripts/run_hedged_requests.py"
+      - ".github/workflows/hedged-requests.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  hedged-requests:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      HIA_HEDGE_MODEL: ${{ inputs.model || 'meta-llama/Llama-3.1-8B-Instruct' }}
+      HIA_HEDGE_PRIMARY: ${{ inputs.primary || 'nscale' }}
+      HIA_HEDGE_FALLBACK: ${{ inputs.fallback || 'novita' }}
+      HIA_HEDGE_THRESHOLDS_MS: ${{ inputs.thresholds_ms || '500,1000,1500,2000' }}
+      HIA_HEDGE_REPEATED_TRIALS: ${{ inputs.repeated_trials || '10' }}
+      HIA_CANARY_PER_DOMAIN: "2"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install
+        run: pip install -e .
+      - name: Run hedged request qualification
+        run: python scripts/run_hedged_requests.py
+      - name: Upload Phase 1.7 evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: hia-phase-1-7-hedged-requests
+          path: artifacts/hedged_requests_latest.json
+          retention-days: 30

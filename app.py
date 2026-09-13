@@ -5,6 +5,7 @@ import json
 import pandas as pd
 import streamlit as st
 from huggingface_hub import hf_hub_download
+from huggingface_hub.errors import HfHubHTTPError
 
 from hia.runner import run_demo
 
@@ -22,7 +23,7 @@ try:
     )
     with open(live_path, encoding="utf-8") as handle:
         live = json.load(handle)
-except Exception:
+except (OSError, ValueError, HfHubHTTPError):
     live = None
 
 if live:

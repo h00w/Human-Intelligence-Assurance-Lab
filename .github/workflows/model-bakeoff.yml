@@ -1,0 +1,56 @@
+name: Live Model Bakeoff
+
+on:
+  workflow_dispatch:
+    inputs:
+      baseline_model:
+        description: Baseline Hugging Face model id
+        required: false
+        default: ibm-granite/granite-4.2-3b
+      candidate_model:
+        description: Candidate Hugging Face model id
+        required: false
+        default: meta-llama/Llama-3.1-8B-Instruct
+      provider:
+        description: Hugging Face inference provider
+        required: false
+        default: deepinfra
+      per_domain:
+        description: Canary cases per domain
+        required: false
+        default: '2'
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/run_model_bakeoff.py'
+      - '.github/workflows/model-bakeoff.yml'
+      - 'hia/comparison.py'
+      - 'hia/model_eval.py'
+
+jobs:
+  bakeoff:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      HIA_BASELINE_MODEL: ${{ inputs.baseline_model || 'ibm-granite/granite-4.2-3b' }}
+      HIA_CANDIDATE_MODEL: ${{ inputs.candidate_model || 'meta-llama/Llama-3.1-8B-Instruct' }}
+      HIA_BAKEOFF_PROVIDER: ${{ inputs.provider || 'deepinfra' }}
+      HIA_CANARY_PER_DOMAIN: ${{ inputs.per_domain || '2' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install
+        run: pip install -e .
+      - name: Run safety-first model bakeoff
+        run: python scripts/run_model_bakeoff.py
+      - name: Upload bakeoff evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: hia-model-bakeoff
+          path: artifacts/model_bakeoff_latest.json
+          retention-days: 30

@@ -9,7 +9,13 @@ import streamlit as st
 from huggingface_hub import hf_hub_download
 from huggingface_hub.utils import HfHubHTTPError
 
-from hia.review_execution import REVIEWER_FIELDS, csv_bytes, make_reviewer_sheet, queue_fingerprint, validate_frozen_queue
+from hia.review_execution import (
+    REVIEWER_FIELDS,
+    csv_bytes,
+    make_reviewer_sheet,
+    queue_fingerprint,
+    validate_frozen_queue,
+)
 
 DATASET = "h0000w/Human-Intelligence-Assurance-Lab"
 QUEUE_PATH = "runs/human_review_queue.csv"
@@ -23,7 +29,7 @@ Review the frozen candidate responses independently. Do not use another AI syste
 For every row, set `human_pass` to `true` or `false` and optionally add a concise rationale in `notes`.
 Do not edit, delete, add, or reorder frozen fields. Do not compare labels with the other reviewer until both sheets are complete.
 
-The sheets intentionally hide model-judge labels and scores. Judge outputs are rejoined only after independent review import.
+The sheets contain no model-judge labels or scores. Semantic-judge scoring happens only after independent human review.
 """
 
 
@@ -49,7 +55,10 @@ def load_queue():
 
 st.set_page_config(page_title="Human Calibration", page_icon="👥", layout="wide")
 st.title("👥 Independent Human Semantic Calibration")
-st.caption("Blinded reviewer execution, explicit adjudication, provenance validation, and release-gate reporting.")
+st.caption(
+    "Frozen qualified responses → blinded independent review → explicit adjudication → "
+    "post-review shadow judge → release-gate calibration."
+)
 
 manifest = load_json(MANIFEST_PATH)
 report = load_json(REPORT_PATH)
@@ -59,12 +68,16 @@ m1, m2, m3, m4 = st.columns(4)
 m1.metric("Frozen samples", len(queue) if queue else "—")
 m2.metric("Required reviewers", "2 / sample")
 m3.metric("Inter-reviewer κ", (report or {}).get("inter_reviewer_kappa", "pending"))
-m4.metric("Semantic gate", "PASS" if (report or {}).get("semantic_release_critical") is True else "BLOCKED")
+m4.metric(
+    "Semantic gate",
+    "PASS" if (report or {}).get("semantic_release_critical") is True else "BLOCKED",
+)
 
 st.subheader("Release contract")
 st.write(
     "The semantic judge stays shadow-only until there are ≥20 resolved independently reviewed samples, "
-    "≥2 reviewers per sample, inter-reviewer κ ≥0.70, judge-vs-human κ ≥0.70, and critical-failure recall ≥0.95."
+    "≥2 reviewers per sample, inter-reviewer κ ≥0.70, judge-vs-human κ ≥0.70, "
+    "and critical-failure recall ≥0.95."
 )
 
 if queue:
@@ -94,7 +107,10 @@ if queue:
         mime="text/markdown",
         use_container_width=True,
     )
-    st.info("Reviewer files are blinded: model-judge pass/fail and score fields are deliberately excluded.")
+    st.info(
+        "Reviewer files are pre-judge blinded: the semantic judge has not been scored for this batch yet, "
+        "so model-judge output cannot anchor human labels."
+    )
     with st.expander("Frozen batch coverage"):
         frame = pd.DataFrame(queue)
         st.dataframe(
@@ -112,6 +128,8 @@ if manifest:
             "status": manifest.get("status"),
             "sample_count": manifest.get("sample_count"),
             "frozen_queue_sha256": manifest.get("frozen_queue_sha256"),
+            "judge_status": manifest.get("judge_status"),
+            "source_evidence": manifest.get("source_evidence"),
             "blinded_fields": manifest.get("blinded_fields"),
         }
     )
@@ -127,7 +145,10 @@ if report:
     r3.metric("Judge-human κ", judge_report.get("cohen_kappa", "pending"))
     r4.metric("Critical recall", judge_report.get("critical_recall", "pending"))
     if report.get("semantic_release_critical") is True:
-        st.success("Independent calibration contract passed. Semantic judging may become release-critical for the calibrated scope.")
+        st.success(
+            "Independent calibration contract passed. Semantic judging may become release-critical "
+            "for the calibrated scope."
+        )
     else:
         st.warning("Calibration artifact exists but does not satisfy the release-critical contract.")
         for reason in report.get("reasons", []):
@@ -135,17 +156,22 @@ if report:
 else:
     st.info("No independently reviewed calibration report is published. Semantic judging remains shadow-only.")
 
-st.subheader("Import and adjudication")
+st.subheader("Import, adjudication, then post-review judge")
 st.code(
     "python scripts/import_human_calibration_reviews.py reviewer_A.csv reviewer_B.csv\n"
-    "# If disagreements exist, complete adjudication_queue.csv, then:\n"
+    "# If disagreements exist, complete adjudication_queue.csv, then rerun with:\n"
     "python scripts/import_human_calibration_reviews.py reviewer_A.csv reviewer_B.csv "
-    "--adjudication adjudication_queue.csv\n"
-    "HIA_HUMAN_REVIEW_CSV=artifacts/human_calibration_import/merged_human_labels.csv "
+    "--adjudication adjudication_queue.csv\n\n"
+    "# Only after human review is frozen, run the semantic judge:\n"
+    "HF_TOKEN=... HIA_JUDGE_MODEL=<independent-model> "
+    "python scripts/run_post_review_semantic_judge.py\n\n"
+    "# Finally score the judge against the validated human labels:\n"
+    "HIA_HUMAN_REVIEW_CSV=artifacts/human_calibration_judge/calibration_scoring_input.csv "
     "python scripts/score_human_calibration.py",
     language="bash",
 )
 st.caption(
     "Original reviewer labels are preserved. Missing labels, duplicate reviewer identities, frozen-field edits, "
-    "unknown samples, and incomplete adjudications are rejected rather than inferred."
+    "unknown samples, and incomplete adjudications are rejected rather than inferred. Judge scoring is delayed "
+    "until after human labels are complete to remove judge-output anchoring."
 )

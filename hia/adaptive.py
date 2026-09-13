@@ -79,15 +79,10 @@ def fallback_timeout_budget_s(
     min_timeout_s: float = 4.0,
     max_timeout_s: float = 6.5,
 ) -> float:
-    """Derive the fallback request deadline from the end-to-end p95 budget.
-
-    The fallback starts after ``hedge_delay_ms``. Its request deadline is bounded so the
-    configured path still leaves a fixed safety margin before the 8-second production p95
-    ceiling. The production gate remains authoritative if actual latency violates the SLO.
-    """
+    """Derive a fallback deadline that never rounds above the p95 envelope."""
     available_ms = p95_slo_ms - hedge_delay_ms - safety_margin_ms
-    timeout_s = available_ms / 1000
-    return round(max(min_timeout_s, min(max_timeout_s, timeout_s)), 3)
+    timeout_s = max(min_timeout_s, min(max_timeout_s, available_ms / 1000))
+    return math.floor(timeout_s * 1000) / 1000
 
 
 class AdaptiveHedgedAdapter(ModelAdapter):

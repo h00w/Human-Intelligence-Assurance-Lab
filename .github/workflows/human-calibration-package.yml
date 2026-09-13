@@ -1,0 +1,36 @@
+name: Human Calibration Package
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'hia/review_execution.py'
+      - 'scripts/prepare_human_calibration_package.py'
+      - 'scripts/prepare_independent_review.py'
+      - 'pages/7_Human_Calibration.py'
+      - '.github/workflows/human-calibration-package.yml'
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install
+        run: pip install -e .
+      - name: Generate blinded reviewer package
+        run: python scripts/prepare_human_calibration_package.py
+      - name: Upload reviewer package
+        uses: actions/upload-artifact@v4
+        with:
+          name: hia-human-calibration-review-package
+          path: artifacts/human_calibration_package/
+          retention-days: 90

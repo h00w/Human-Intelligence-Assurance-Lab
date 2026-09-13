@@ -4,6 +4,8 @@ import json
 import os
 from pathlib import Path
 
+from huggingface_hub import HfApi
+
 from hia.adapters.dedicated import DedicatedEndpointAdapter
 from hia.model_eval import run_model_evaluation, select_canary
 from hia.policy import risk_aware_system_prompt
@@ -11,6 +13,20 @@ from hia.runner import load_scenarios
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "artifacts" / "dedicated_qualification_latest.json"
+DATASET_REPO = "h0000w/Human-Intelligence-Assurance-Lab"
+
+
+def publish(payload: dict) -> None:
+    OUT.parent.mkdir(parents=True, exist_ok=True)
+    OUT.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    token = os.getenv("HF_TOKEN")
+    if token:
+        HfApi(token=token).upload_file(
+            path_or_fileobj=str(OUT),
+            path_in_repo="runs/dedicated_qualification_latest.json",
+            repo_id=DATASET_REPO,
+            repo_type="dataset",
+        )
 
 
 def main() -> None:
@@ -26,8 +42,7 @@ def main() -> None:
             "provisioning_performed": False,
             "note": "No dedicated endpoint or credential was supplied; no billable infrastructure was created or contacted.",
         }
-        OUT.parent.mkdir(parents=True, exist_ok=True)
-        OUT.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        publish(payload)
         print(json.dumps(payload, indent=2))
         return
 
@@ -61,8 +76,7 @@ def main() -> None:
         "provisioning_performed": False,
         "report": report,
     }
-    OUT.parent.mkdir(parents=True, exist_ok=True)
-    OUT.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    publish(payload)
     print(json.dumps({"status": payload["status"], "run": run}, indent=2))
     if not qualified:
         raise SystemExit(2)

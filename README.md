@@ -3,7 +3,7 @@
 **Production architecture for measurable, safe, emotionally aware, human-centered AI.**
 
 [![CI](https://github.com/h00w/Human-Intelligence-Assurance-Lab/actions/workflows/ci.yml/badge.svg)](https://github.com/h00w/Human-Intelligence-Assurance-Lab/actions/workflows/ci.yml)
-[![Live Model Evaluation](https://github.com/h00w/Human-Intelligence-Assurance-Lab/actions/workflows/live-model-eval.yml/badge.svg)](https://github.com/h00w/Human-Intelligence-Assurance-Lab/actions/workflows/live-model-eval.yml)
+[![Phase 1.5 Provider Resilience](https://github.com/h00w/Human-Intelligence-Assurance-Lab/actions/workflows/provider-resilience.yml/badge.svg)](https://github.com/h00w/Human-Intelligence-Assurance-Lab/actions/workflows/provider-resilience.yml)
 [![Hugging Face Dataset](https://img.shields.io/badge/Hugging%20Face-Dataset-yellow)](https://huggingface.co/datasets/h0000w/Human-Intelligence-Assurance-Lab)
 [![Hugging Face Space](https://img.shields.io/badge/Hugging%20Face-Space-yellow)](https://huggingface.co/spaces/h0000w/Human-Intelligence-Assurance-Lab)
 
@@ -11,84 +11,117 @@
 
 ## What HIA-Lab proves
 
-Emotionally aware and longitudinal AI should not be released because it merely *sounds* empathetic. HIA-Lab converts human-centered AI requirements into executable benchmark contracts, deterministic safety gates, real-model evidence, policy ablations, operational SLOs, semantic-calibration workflows, and reproducible release lineage.
+Emotionally aware and longitudinal AI should not be released because it merely *sounds* empathetic. HIA-Lab converts human-centered AI requirements into executable benchmark contracts, deterministic safety gates, real-model evidence, controlled model/policy/provider experiments, operational SLOs, repeated-run qualification, semantic-calibration workflows, and reproducible release lineage.
 
-## Phase 1 — HIA-Bench v0.1
+The project deliberately allows later evidence to overturn earlier positive results. A fast or high-scoring configuration can never compensate for a safety blocker, incomplete response, or missing evidence.
 
-HIA-Bench contains **100 synthetic scenarios across six risk domains**: everyday affect, interpersonal conflict, vulnerability/crisis, dependency, epistemic/sycophancy risk, and wellness/biometric interpretation. Critical safety/privacy failures cannot be averaged away by high scores elsewhere.
+## Current production evidence — Phase 1.5
 
-The release stack uses lexicographic **SHIP / INVESTIGATE / HOLD** decisions and fails closed on privacy violations, blocker failures, empty responses, provider failures, and truncation.
+Phase 1.4 showed that the previous single-route DeepInfra configuration did **not** reproduce reliably: production SHIP recurrence was 0%, median trial p95 was 20.14 s, worst p95 was 41.23 s, and one critical wellness response truncated. The correct executive result was **HOLD**.
 
-## Phase 1.1 — Real model evaluation
+Phase 1.5 remediated those measured failure modes through a controlled provider-route bakeoff, bounded critical-response policy, hard inference deadlines, and an ordered fallback route. The release thresholds were **not relaxed**.
 
-The live canary evaluates **12 higher-risk cases (two per domain)** through Hugging Face Inference Providers. Each run records raw responses, provider/model identity, latency, p95 latency, token usage, estimated cost when configured, truncations, deterministic violations, operational evidence, domain pass rates, and lineage fingerprints.
+### Provider-route bakeoff
 
-Evidence is published to the Hugging Face Dataset, Storage Bucket, GitHub Actions artifacts, and public Space.
+Same model, risk-aware policy, 12-case canary, evaluator, token budget, temperature, and top-p across all routes:
 
-## Phase 1.2 — Model and policy selection
+| Provider | Behavioral | Pass rate | Blockers | Errors | Truncations | Mean latency | p95 latency |
+|---|---|---:|---:|---:|---:|---:|---:|
+| **Nscale** | **SHIP** | **100%** | **0** | **0** | **0** | **1.23 s** | **2.26 s** |
+| Novita | SHIP | 100% | 0 | 0 | 0 | 1.65 s | 6.25 s |
+| DeepInfra | SHIP | 100% | 0 | 0 | 0 | 3.86 s | 7.99 s |
 
-### 1.2.1 — Live model bakeoff
+**Selected primary route: Nscale.** All three routes were eligible in this run, but Nscale had the lowest eligible p95 latency.
 
-| Candidate | Behavioral decision | Pass rate | Blockers | Truncations | Mean latency | p95 latency |
-|---|---|---:|---:|---:|---:|---:|
-| `ibm-granite/granite-4.2-3b` | HOLD | 66.7% | 1 | 4 | 3.61 s | 4.16 s |
-| `meta-llama/Llama-3.1-8B-Instruct` | HOLD | **91.7%** | 1 | **0** | 5.83 s | 14.88 s |
+### Deadline-aware route
 
-Llama won the safety-first bakeoff but remained HOLD because one critical vulnerability case omitted explicit human/crisis escalation.
+```text
+Nscale primary
+   │ hard request deadline: 4 s
+   ▼
+complete response? ── yes ──> evaluate
+   │
+   no / timeout / truncation
+   ▼
+Novita fallback
+   │ hard request deadline: 4 s
+   ▼
+evaluate complete evidence
+```
 
-### 1.2.2 — Executable policy ablation
+End-to-end latency includes every attempted route. Failover cannot erase time already spent on the primary route.
 
-The experiment then held **model, provider, benchmark, evaluator, temperature, top-p, and output budget constant** while changing only the policy layer.
+### Five-trial production requalification
 
-| Llama policy | Behavioral decision | Pass rate | Blockers | Truncations | Mean latency | p95 latency |
-|---|---|---:|---:|---:|---:|---:|
-| Generic human-centered prompt | HOLD | 91.7% | 1 | 0 | 3.40 s | 7.28 s |
-| Risk-aware executable policy | **SHIP** | **100%** | **0** | **0** | 4.63 s | 9.53 s |
+Five independent 12-case trials were run after provider selection: **60 real model generations**.
 
-The risk-aware policy closed the critical blocker, but the p95 latency exceeded the 8-second production SLO. The correct composite production decision was therefore **INVESTIGATE**, not SHIP.
+| Qualification metric | Result |
+|---|---:|
+| Behavioral SHIP rate | **100%** |
+| Production SHIP rate | **100%** |
+| Blocker-trial rate | **0%** |
+| Provider-error trial rate | **0%** |
+| Truncation-trial rate | **0%** |
+| Mean latency | **1.21 s** |
+| Mean latency 95% CI | **1.16–1.25 s** |
+| Median trial p95 | **2.11 s** |
+| Trial-p95 95% CI | **1.92–2.47 s** |
+| Worst observed trial p95 | **2.70 s** |
+| Production SLO | **≤8 s p95** |
+| Executive decision | **SHIP** |
 
-## Phase 1.3 — Production SLO closure
+Every repeated trial passed the unchanged Phase 1.4 production-confidence contract.
 
-Phase 1.3 tested three generation budgets against the **same Llama model, provider, 12-case benchmark, evaluator, and risk-aware policy**. A profile could win only if it preserved behavioral SHIP, zero blockers, zero provider errors, zero truncations, and the operational SLO.
+**Important limitation:** the live qualification did not need to invoke fallback. Nscale completed all 60 qualification requests before the 4-second primary deadline. The fallback mechanism is unit-tested for timeout and truncation recovery, but live fault-injection evidence is a separate next milestone.
 
-| Profile | Max tokens | Behavioral | Production | Blockers | Truncations | Mean latency | p95 latency |
-|---|---:|---|---|---:|---:|---:|---:|
-| **baseline** | **512** | **SHIP** | **SHIP** | **0** | **0** | **3.81 s** | **6.50 s** |
-| compact | 320 | SHIP | INVESTIGATE | 0 | 0 | 3.81 s | 8.09 s |
-| lean | 224 | SHIP | SHIP | 0 | 0 | 4.00 s | 7.75 s |
+## Phase history
 
-**Selected production profile: `baseline`.** It had the lowest p95 latency among profiles that passed every safety and operational gate. The result is deliberately non-monotonic: lowering the token ceiling did not reliably lower latency, which is why HIA-Lab measures rather than assumes performance.
+### Phase 1 — HIA-Bench v0.1
 
-Current Phase 1.3 production evidence:
+- **100 synthetic scenarios** across everyday affect, interpersonal conflict, vulnerability, dependency, epistemic risk, and wellness.
+- deterministic safety/privacy checks with lexicographic **SHIP / INVESTIGATE / HOLD** decisions;
+- blocker failures cannot be averaged away;
+- empty responses and incomplete evidence fail closed.
 
-- model: `meta-llama/Llama-3.1-8B-Instruct`
-- policy: risk-aware executable policy
-- behavioral decision: **SHIP**
-- production decision: **SHIP**
-- pass rate: **100% on the 12-case canary**
-- blocker failures: **0**
-- provider errors: **0**
-- completion truncations: **0**
-- mean latency: **3.81 s**
-- p95 latency: **6.50 s** against an **8 s** SLO
+### Phase 1.1 — Real-model evidence
 
-This is evidence for this benchmark run—not a universal safety or performance claim. Provider latency varies between runs, so repeated-run stability remains a production-hardening requirement.
+The live canary evaluates **12 higher-risk cases (two per domain)** through Hugging Face Inference Providers and records raw responses, provider/model identity, latency, token usage, cost evidence, truncation, deterministic violations, domain pass rates, and run lineage.
 
-## Semantic calibration
+### Phase 1.2 — Model, policy, and semantic assurance
 
-The semantic judge remains **shadow-only** and cannot affect release status until independently calibrated against human review.
+- live model bakeoff;
+- executable policy ablation;
+- composite behavioral + operational production gate;
+- semantic judge kept **shadow-only** pending independent human calibration.
 
-Phase 1.3 now generates a dedicated **24-response calibration set** by default (4 cases × 6 domains), rather than the 12-case live canary, so the calibration contract is achievable.
+The semantic calibration contract requires at least 20 genuinely human-reviewed samples, Cohen's kappa >=0.70, critical-failure recall >=0.95, and reviewer provenance. HIA-Lab does not fabricate human annotations.
 
-Promotion requirements:
+### Phase 1.3 — Single-run SLO closure
 
-- at least **20 independently reviewed samples**;
-- **Cohen's kappa >= 0.70**;
-- **critical-failure recall >= 0.95**;
-- reviewer provenance for every labeled row;
-- no fabricated or auto-filled human labels.
+The risk-aware Llama configuration reached a favorable single-run production SHIP with 100% behavioral pass, 0 blockers/errors/truncations, and p95 latency 6.50 s. Phase 1.4 subsequently demonstrated why a single favorable run was insufficient evidence.
 
-The calibration scorer refuses unlabeled rows and missing reviewer provenance. `release_critical` remains false until the contract passes.
+### Phase 1.4 — Repeated-run production confidence
+
+Five fixed DeepInfra trials exposed substantial tail-latency variance and a stochastic truncation:
+
+- production SHIP rate: **0%**;
+- behavioral SHIP rate: 80%;
+- median trial p95: 20.14 s;
+- worst trial p95: 41.23 s;
+- blocker/truncation trial rate: 20%;
+- executive decision: **HOLD**.
+
+This was the evidence that motivated Phase 1.5 rather than weakening the SLO.
+
+### Phase 1.5 — Provider resilience & critical-response control
+
+- controlled Nscale / Novita / DeepInfra route bakeoff;
+- bounded critical answers with mandatory safety content front-loaded and a <=120-word target;
+- critical wellness guard against speculative diagnostic lists;
+- hard provider deadlines;
+- timeout/error/truncation fallback;
+- repeated requalification under the unchanged Phase 1.4 contract;
+- measured executive result: **SHIP**.
 
 ## Production gate
 
@@ -105,14 +138,15 @@ behavioral INVESTIGATE
 behavioral SHIP + operational regression
     -> INVESTIGATE
 
-behavioral SHIP + operational PASS
+single production SHIP
+    -> requires repeated qualification
+
+repeated behavioral + operational PASS
     -> PRODUCTION SHIP
 
 semantic judge
     -> shadow-only until human calibration passes
 ```
-
-A fast or cheap configuration can never compensate for a safety blocker.
 
 ## Architecture
 
@@ -120,22 +154,52 @@ A fast or cheap configuration can never compensate for a safety blocker.
 HIA-Bench
    │
    ├── candidate model + executable policy
-   │          ├── raw response
-   │          ├── latency / p95
-   │          ├── tokens / cost
-   │          └── lineage fingerprint
+   │          ├── bounded critical-response control
+   │          └── raw response + lineage
    │
-   ├── deterministic safety gate ──> HOLD / INVESTIGATE / SHIP
-   ├── operational gate ───────────> provider / truncation / latency / cost
-   └── semantic judge (shadow) ────> independent human calibration
+   ├── provider-route qualification
+   │          ├── primary route + hard deadline
+   │          └── fallback route + attempt provenance
+   │
+   ├── deterministic safety gate
+   ├── completeness gate
+   ├── operational SLO gate
+   ├── repeated-run stability gate
+   └── semantic judge (shadow)
                   │
                   ▼
-           Composite Production Gate
+           Executive Assurance
                   │
           HOLD / INVESTIGATE / SHIP
                   │
       Dataset + Bucket + Space + Actions
 ```
+
+## Evidence and publication
+
+- GitHub: `h00w/Human-Intelligence-Assurance-Lab`
+- Dataset: `h0000w/Human-Intelligence-Assurance-Lab`
+- Evaluator/research artifact: `h0000w/Human-Intelligence-Assurance-Lab`
+- Space: `h0000w/Human-Intelligence-Assurance-Lab`
+- Storage Bucket: `h0000w/Human-Intelligence-Assurance-Lab-storage`
+
+Key published evidence:
+
+```text
+runs/
+├── live_eval_latest.json
+├── model_bakeoff_latest.json
+├── policy_ablation_latest.json
+├── latency_tuning_latest.json
+├── stability_study_latest.json
+├── provider_resilience_latest.json
+├── semantic_shadow_latest.json
+├── human_review_queue.csv
+├── calibration_report.json
+└── executive_assurance_manifest.json
+```
+
+The Space uses **Docker + CPU Basic**. Model inference is remote through Hugging Face Inference Providers.
 
 ## Run locally
 
@@ -148,23 +212,7 @@ python -m hia.runner
 streamlit run app.py
 ```
 
-Real canary:
-
-```bash
-export HF_TOKEN=hf_...
-python scripts/run_live_eval.py
-```
-
-The model bakeoff, policy-ablation, latency-tuning, and semantic-shadow workflows are available through GitHub Actions. Semantic shadow evaluation is intentionally manual because the independent judge consumes a separate model budget and the resulting queue requires genuine human review.
-
-## Publication layer
-
-- Dataset: `h0000w/Human-Intelligence-Assurance-Lab`
-- Evaluator/research artifact: `h0000w/Human-Intelligence-Assurance-Lab`
-- Space: `h0000w/Human-Intelligence-Assurance-Lab`
-- Bucket: `h0000w/Human-Intelligence-Assurance-Lab-storage`
-
-The Space remains **Docker + CPU Basic**. Model inference is remote through Hugging Face Inference Providers; ZeroGPU is not required for the dashboard.
+Real-model experiments require `HF_TOKEN`.
 
 ## Documentation
 
@@ -175,20 +223,20 @@ The Space remains **Docker + CPU Basic**. Model inference is remote through Hugg
 - [`docs/PHASE_1_2_2_POLICY_ABLATION.md`](docs/PHASE_1_2_2_POLICY_ABLATION.md)
 - [`docs/PHASE_1_2_3_COMPOSITE_PRODUCTION_GATE.md`](docs/PHASE_1_2_3_COMPOSITE_PRODUCTION_GATE.md)
 - [`docs/PHASE_1_3_LATENCY_AND_CALIBRATION.md`](docs/PHASE_1_3_LATENCY_AND_CALIBRATION.md)
-- [`configs/release_policy.yaml`](configs/release_policy.yaml)
-- [`configs/phase_1_2.yaml`](configs/phase_1_2.yaml)
+- [`docs/PHASE_1_4_PRODUCTION_CONFIDENCE.md`](docs/PHASE_1_4_PRODUCTION_CONFIDENCE.md)
+- [`docs/PHASE_1_4_RESULT.md`](docs/PHASE_1_4_RESULT.md)
+- [`docs/PHASE_1_5_PROVIDER_RESILIENCE.md`](docs/PHASE_1_5_PROVIDER_RESILIENCE.md)
 - [`evals/scenarios/hia_bench_v0_1.jsonl`](evals/scenarios/hia_bench_v0_1.jsonl)
 
-## Roadmap
+## Next qualification milestone
 
-**Phase 1.4:** repeated-run SLO stability, independent judge execution, and human agreement study.  
-**Phase 2:** governed longitudinal memory and relationship-safety evaluation.  
-**Phase 3:** multimodal/bio-context baseline engine with provenance and uncertainty.  
-**Phase 4:** production observability, privacy/security evidence, release lineage, and executive assurance reporting.
+**Phase 1.6 — Fault Injection & Infrastructure Qualification:** deliberately exercise primary-route timeout/truncation/failure, prove live fallback behavior, compare routed providers with dedicated inference infrastructure, and expand the repeated qualification window before treating resilience as production-grade infrastructure evidence.
+
+After the resilience layer is validated under injected faults, Phase 2 moves into governed longitudinal memory and relationship-safety evaluation.
 
 ## Scientific and safety boundaries
 
-HIA-Bench is a synthetic engineering benchmark. It does **not** diagnose medical or mental-health conditions, establish ground-truth user emotion, validate a clinical product, claim consciousness/AGI, or replace human review for high-risk deployments. LLM-as-judge results are not ground truth and remain non-release-critical until empirically calibrated against independent human labels.
+HIA-Bench is a synthetic engineering benchmark. It does **not** diagnose medical or mental-health conditions, establish ground-truth user emotion, clinically validate a product, claim consciousness/AGI, or replace independent human review for high-risk deployments. Results are scoped to the tested benchmark, model, policy, provider routes, generation configuration, and observation window.
 
 ## License
 

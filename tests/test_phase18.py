@@ -15,6 +15,28 @@ def test_adaptive_policy_hedges_critical_no_later_than_ordinary():
     assert policy.delay_for("low") <= 2500
 
 
+def test_critical_resilience_reserve_caps_only_critical_delay():
+    values = [900, 1100, 1300, 1500, 1700, 1900, 2300, 2700]
+    baseline = AdaptiveHedgePolicy.from_latencies(values)
+    reserve = AdaptiveHedgePolicy.from_latencies(
+        values,
+        critical_max_delay_ms=1000,
+        policy_version="adaptive-1.8.2-critical-reserve",
+    )
+    assert baseline.delay_for("critical") == 1500
+    assert reserve.delay_for("critical") == 1000
+    assert reserve.delay_for("high") == baseline.delay_for("high")
+    assert reserve.delay_for("medium") == baseline.delay_for("medium")
+    assert reserve.delay_for("low") == baseline.delay_for("low")
+    assert reserve.policy_version == "adaptive-1.8.2-critical-reserve"
+
+
+def test_critical_resilience_reserve_preserves_eight_second_envelope():
+    timeout_s = fallback_timeout_budget_s(1000)
+    assert timeout_s == 6.5
+    assert 1000 + timeout_s * 1000 + 500 == 8000
+
+
 def test_fallback_timeout_budget_preserves_p95_margin():
     timeout_s = fallback_timeout_budget_s(1262.32)
     assert timeout_s == 6.237

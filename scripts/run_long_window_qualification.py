@@ -15,13 +15,13 @@ SOURCE = ROOT / "artifacts" / "adaptive_hedging_latest.json"
 OUT = ROOT / "artifacts" / "long_window_report.json"
 DATASET_REPO = "h0000w/Human-Intelligence-Assurance-Lab"
 ADAPTIVE_LATEST = "runs/adaptive_hedging_latest.json"
-PREFIX = "runs/long_window/"
+DEFAULT_EPOCH = "critical-reserve-v1"
 
 
 def snapshot_from_payload(payload: dict, timestamp: datetime) -> QualificationSnapshot:
     """Convert one full adaptive qualification into one longitudinal snapshot.
 
-    The longitudinal decision follows the *executive* verdict, not merely the healthy
+    The longitudinal decision follows the executive verdict, not merely the healthy
     adaptive sub-run. Critical fault-recovery failures therefore remain visible.
     """
     adaptive = payload["comparison"]["adaptive"]["report"]
@@ -62,17 +62,21 @@ def main() -> None:
     token = os.getenv("HF_TOKEN")
     now = datetime.now(timezone.utc)
     current_payload = load_current_payload(token)
+    epoch = current_payload.get("qualification_epoch", os.getenv("HIA_QUALIFICATION_EPOCH", DEFAULT_EPOCH))
+    prefix = f"runs/long_window/{epoch}/"
     current = snapshot_from_payload(current_payload, now)
     snapshots = [current]
 
     api = HfApi(token=token)
     if token:
         for path in api.list_repo_files(DATASET_REPO, repo_type="dataset"):
-            if not path.startswith(PREFIX) or not path.endswith(".json"):
+            if not path.startswith(prefix) or not path.endswith(".json"):
                 continue
             try:
                 local = hf_hub_download(DATASET_REPO, path, repo_type="dataset", token=token)
                 prior = json.loads(Path(local).read_text(encoding="utf-8"))
+                if prior.get("qualification_epoch") != epoch:
+                    continue
                 timestamp = datetime.fromisoformat(prior["timestamp"].replace("Z", "+00:00"))
                 snapshots.append(snapshot_from_payload(prior["adaptive_payload"], timestamp))
             except (KeyError, ValueError, json.JSONDecodeError):
@@ -80,32 +84,40 @@ def main() -> None:
 
     report = assess_long_window(snapshots)
     payload = {
-        "schema_version": "1.1",
+        "schema_version": "1.2",
+        "qualification_epoch": epoch,
         "timestamp": now.isoformat().replace("+00:00", "Z"),
         "status": report.status,
         "report": asdict(report),
         "current_snapshot": asdict(current),
         "adaptive_payload": current_payload,
-        "note": "Long-window status follows the full adaptive executive verdict, including repeated critical fault recovery.",
+        "note": (
+            "Long-window status follows the full adaptive executive verdict, including repeated "
+            "critical fault recovery, and only aggregates snapshots from the same qualification epoch."
+        ),
     }
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(payload, indent=2, default=str), encoding="utf-8")
 
     if token:
         stamp = now.strftime("%Y%m%dT%H%M%SZ")
-        api.upload_file(
-            path_or_fileobj=str(OUT),
-            path_in_repo=f"{PREFIX}{stamp}.json",
-            repo_id=DATASET_REPO,
-            repo_type="dataset",
+        for remote in (f"{prefix}{stamp}.json", "runs/long_window_latest.json"):
+            api.upload_file(
+                path_or_fileobj=str(OUT),
+                path_in_repo=remote,
+                repo_id=DATASET_REPO,
+                repo_type="dataset",
+            )
+    print(
+        json.dumps(
+            {
+                "qualification_epoch": epoch,
+                "status": report.status,
+                "report": asdict(report),
+            },
+            indent=2,
         )
-        api.upload_file(
-            path_or_fileobj=str(OUT),
-            path_in_repo="runs/long_window_latest.json",
-            repo_id=DATASET_REPO,
-            repo_type="dataset",
-        )
-    print(json.dumps({"status": report.status, "report": asdict(report)}, indent=2))
+    )
     if report.status == "HOLD":
         raise SystemExit(2)
 

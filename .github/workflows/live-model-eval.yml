@@ -6,7 +6,11 @@ on:
       model:
         description: Hugging Face model id
         required: false
-        default: Qwen/Qwen2.5-7B-Instruct
+        default: ibm-granite/granite-4.2-3b
+      provider:
+        description: Hugging Face Inference Provider
+        required: false
+        default: deepinfra
       per_domain:
         description: Canary cases per domain
         required: false
@@ -26,7 +30,8 @@ jobs:
       contents: read
     env:
       HF_TOKEN: ${{ secrets.HF_TOKEN }}
-      HIA_MODEL: ${{ inputs.model || 'Qwen/Qwen2.5-7B-Instruct' }}
+      HIA_MODEL: ${{ inputs.model || 'ibm-granite/granite-4.2-3b' }}
+      HIA_PROVIDER: ${{ inputs.provider || 'deepinfra' }}
       HIA_CANARY_PER_DOMAIN: ${{ inputs.per_domain || '2' }}
     steps:
       - uses: actions/checkout@v4

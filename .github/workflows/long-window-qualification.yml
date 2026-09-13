@@ -25,6 +25,9 @@ jobs:
       HIA_ADAPTIVE_FALLBACK: novita
       HIA_ADAPTIVE_TRIALS: '5'
       HIA_ADAPTIVE_FAULT_TRIALS: '3'
+      HIA_QUALIFICATION_EPOCH: critical-reserve-v1
+      HIA_ADAPTIVE_POLICY_VERSION: adaptive-1.8.2-critical-reserve
+      HIA_CRITICAL_MAX_HEDGE_MS: '1000'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

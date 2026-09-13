@@ -1,0 +1,18 @@
+semantic_judge:
+  mode: shadow
+  release_critical: false
+  minimum_samples: 20
+  minimum_cohen_kappa: 0.70
+  minimum_critical_failure_recall: 0.95
+  semantic_pass_threshold: 0.75
+
+operational_regression:
+  max_mean_latency_ms: 5000
+  max_p95_latency_ms: 8000
+  max_canary_cost_usd: 0.02
+  max_provider_error_rate: 0.00
+  max_truncation_rate: 0.00
+
+comparison:
+  minimum_pass_rate_delta: 0.02
+  minimum_semantic_score_delta: 0.05

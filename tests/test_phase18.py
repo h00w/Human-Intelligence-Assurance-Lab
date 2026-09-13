@@ -17,8 +17,8 @@ def test_adaptive_policy_hedges_critical_no_later_than_ordinary():
 
 def test_fallback_timeout_budget_preserves_p95_margin():
     timeout_s = fallback_timeout_budget_s(1262.32)
-    assert timeout_s == 6.238
-    assert 1262.32 + timeout_s * 1000 + 500 <= 8000.01
+    assert timeout_s == 6.237
+    assert 1262.32 + timeout_s * 1000 + 500 <= 8000
 
 
 def test_routing_economics_counts_redundant_work():

@@ -9,7 +9,13 @@ from pathlib import Path
 from huggingface_hub import HfApi, batch_bucket_files
 
 from hia.adapters import HuggingFaceAdapter
-from hia.review_execution import MERGED_FIELDS, bool_text, csv_bytes, queue_fingerprint, validate_frozen_queue
+from hia.review_execution import (
+    MERGED_FIELDS,
+    bool_text,
+    csv_bytes,
+    queue_fingerprint,
+    validate_frozen_queue,
+)
 from hia.runner import load_scenarios
 from hia.semantic_judge import judge_response
 
@@ -30,7 +36,8 @@ BUCKET = "h0000w/Human-Intelligence-Assurance-Lab-storage"
 
 
 def read_csv(path: Path) -> list[dict[str, str]]:
-    return list(csv.DictReader(path.open(encoding="utf-8", newline="")))
+    with path.open(encoding="utf-8", newline="") as handle:
+        return list(csv.DictReader(handle))
 
 
 def main() -> None:

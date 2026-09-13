@@ -17,8 +17,9 @@ class HuggingFaceAdapter(ModelAdapter):
         *,
         token: str | None = None,
         provider: str = "deepinfra",
-        max_tokens: int = 220,
-        temperature: float = 0.2,
+        max_tokens: int = 1024,
+        temperature: float = 1.0,
+        top_p: float = 0.95,
         input_price_per_million: float | None = 0.03,
         output_price_per_million: float | None = 0.12,
     ) -> None:
@@ -26,6 +27,7 @@ class HuggingFaceAdapter(ModelAdapter):
         self.routing_provider = provider
         self.max_tokens = max_tokens
         self.temperature = temperature
+        self.top_p = top_p
         self.input_price_per_million = input_price_per_million
         self.output_price_per_million = output_price_per_million
         api_key = token or os.getenv("HF_TOKEN")
@@ -43,9 +45,11 @@ class HuggingFaceAdapter(ModelAdapter):
             ],
             max_tokens=self.max_tokens,
             temperature=self.temperature,
+            top_p=self.top_p,
         )
         latency_ms = (time.perf_counter() - started) * 1000
-        text = response.choices[0].message.content or ""
+        choice = response.choices[0]
+        text = choice.message.content or ""
         usage = getattr(response, "usage", None)
         prompt_tokens = getattr(usage, "prompt_tokens", None)
         completion_tokens = getattr(usage, "completion_tokens", None)
@@ -72,5 +76,11 @@ class HuggingFaceAdapter(ModelAdapter):
             completion_tokens=completion_tokens,
             total_tokens=total_tokens,
             estimated_cost_usd=estimated_cost_usd,
-            metadata={"routing_provider": self.routing_provider},
+            metadata={
+                "routing_provider": self.routing_provider,
+                "finish_reason": getattr(choice, "finish_reason", None),
+                "max_tokens": self.max_tokens,
+                "temperature": self.temperature,
+                "top_p": self.top_p,
+            },
         )

@@ -2,6 +2,12 @@ name: Dedicated Endpoint Qualification
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'hia/adapters/dedicated.py'
+      - 'scripts/run_dedicated_qualification.py'
+      - '.github/workflows/dedicated-qualification.yml'
 
 jobs:
   qualify:

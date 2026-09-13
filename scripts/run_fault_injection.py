@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+from dataclasses import asdict
 from pathlib import Path
 
 from huggingface_hub import HfApi, batch_bucket_files
@@ -43,9 +44,12 @@ def _run_fault_case(
     fallback: str,
     token: str,
     scenarios: list,
+    timeout_budget_ms: float = 0.0,
 ) -> dict:
     primary_adapter = FaultInjectingAdapter(
-        _real_adapter(model=model, provider=primary, token=token), mode=primary_mode
+        _real_adapter(model=model, provider=primary, token=token),
+        mode=primary_mode,
+        latency_ms=timeout_budget_ms if primary_mode == "timeout" else 0.0,
     )
     fallback_adapter = FaultInjectingAdapter(
         _real_adapter(model=model, provider=fallback, token=token), mode=fallback_mode
@@ -59,6 +63,7 @@ def _run_fault_case(
         "name": name,
         "primary_fault": primary_mode,
         "fallback_fault": fallback_mode,
+        "injected_timeout_budget_ms": timeout_budget_ms if primary_mode == "timeout" else 0.0,
         "failover_rate": round(failover_rate(report), 4),
         "average_attempts": round(average_attempts(report), 4),
         "report": report,
@@ -84,9 +89,9 @@ def main() -> None:
     fallback = os.getenv("HIA_FAULT_FALLBACK", "novita")
     per_domain = int(os.getenv("HIA_CANARY_PER_DOMAIN", "2"))
     repeated_trials = int(os.getenv("HIA_FAULT_REPEATED_TRIALS", "10"))
+    timeout_budget_ms = float(os.getenv("HIA_FAULT_TIMEOUT_BUDGET_MS", "4000"))
     scenarios = select_canary(load_scenarios(), per_domain=per_domain)
 
-    # Live fault injection: primary is deliberately broken while fallback remains a real route.
     timeout_case = _run_fault_case(
         name="primary_timeout_recovery",
         primary_mode="timeout",
@@ -96,6 +101,7 @@ def main() -> None:
         fallback=fallback,
         token=token,
         scenarios=scenarios,
+        timeout_budget_ms=timeout_budget_ms,
     )
     truncation_case = _run_fault_case(
         name="primary_truncation_recovery",
@@ -108,8 +114,6 @@ def main() -> None:
         scenarios=scenarios,
     )
 
-    # Simultaneous degradation must fail closed. Use a compact 2-case slice to avoid
-    # wasting remote inference because both routes are deterministically faulted.
     degraded_scenarios = scenarios[:2]
     dual_failure_case = _run_fault_case(
         name="simultaneous_provider_degradation",
@@ -123,7 +127,6 @@ def main() -> None:
     )
     dual_failure_holds = dual_failure_case["report"]["production_decision"]["decision"] == "HOLD"
 
-    # Larger observation window: 10 repeated real runs with healthy primary/fallback.
     repeated_reports: list[dict] = []
     for trial in range(1, repeated_trials + 1):
         report = run_model_evaluation(
@@ -144,8 +147,6 @@ def main() -> None:
         repeated_reports.append(report)
     stability = summarize_stability(repeated_reports, minimum_trials=repeated_trials)
 
-    # Dedicated infrastructure comparison is executable only when a dedicated endpoint
-    # has been provisioned explicitly. Phase 1.6 does not silently incur paid endpoint cost.
     dedicated_url = os.getenv("HIA_DEDICATED_ENDPOINT_URL")
     infrastructure_comparison = {
         "routed": {
@@ -153,7 +154,7 @@ def main() -> None:
             "fallback": fallback,
             "model": model,
             "qualification": "measured",
-            "stability": stability.__dict__ if hasattr(stability, "__dict__") else None,
+            "stability": asdict(stability),
         },
         "dedicated": {
             "status": "NOT_CONFIGURED" if not dedicated_url else "CONFIGURED_NOT_EXECUTED",
@@ -170,7 +171,7 @@ def main() -> None:
     recovery_pass = _fault_recovered(timeout_case) and _fault_recovered(truncation_case)
     executive_ship = recovery_pass and dual_failure_holds and stability.stable
     payload = {
-        "schema_version": "1.6",
+        "schema_version": "1.6.1",
         "purpose": "fault injection and infrastructure qualification",
         "model": model,
         "routes": {"primary": primary, "fallback": fallback},
@@ -184,19 +185,7 @@ def main() -> None:
         "extended_qualification": {
             "trial_count": repeated_trials,
             "scenario_count_per_trial": len(scenarios),
-            "stability": {
-                "trials": stability.trials,
-                "production_ship_rate": stability.production_ship_rate,
-                "behavioral_ship_rate": stability.behavioral_ship_rate,
-                "blocker_trial_rate": stability.blocker_trial_rate,
-                "provider_error_trial_rate": stability.provider_error_trial_rate,
-                "truncation_trial_rate": stability.truncation_trial_rate,
-                "mean_latency_ms": stability.mean_latency_ms,
-                "median_trial_p95_ms": stability.median_trial_p95_ms,
-                "worst_trial_p95_ms": stability.worst_trial_p95_ms,
-                "stable": stability.stable,
-                "reasons": stability.reasons,
-            },
+            "stability": asdict(stability),
             "trials": repeated_reports,
         },
         "infrastructure_comparison": infrastructure_comparison,
@@ -211,9 +200,9 @@ def main() -> None:
             "dedicated_infrastructure_release_critical": False,
         },
         "interpretation": (
-            "Injected faults are explicitly labeled and are used to exercise the real fallback route. "
-            "Natural provider failures remain separately observable. Dedicated-endpoint comparison is non-release-critical "
-            "until an endpoint is explicitly provisioned."
+            "Injected timeout latency includes the consumed deadline budget before fallback. Injected faults are explicitly "
+            "labeled and use the real fallback route. Dedicated-endpoint comparison is non-release-critical until an "
+            "endpoint is explicitly provisioned."
         ),
     }
 
@@ -226,17 +215,29 @@ def main() -> None:
         repo_id=DATASET_REPO,
         repo_type="dataset",
     )
-    batch_bucket_files(BUCKET, add=[(str(OUT), "runs/fault_injection_latest.json")], token=token)
+    batch_bucket_files(
+        BUCKET,
+        add=[(str(OUT), "runs/fault_injection_latest.json")],
+        token=token,
+    )
 
-    print(json.dumps({
-        "timeout_recovered": _fault_recovered(timeout_case),
-        "truncation_recovered": _fault_recovered(truncation_case),
-        "dual_failure_holds": dual_failure_holds,
-        "extended_stable": stability.stable,
-        "worst_trial_p95_ms": stability.worst_trial_p95_ms,
-        "decision": payload["executive_decision"]["decision"],
-        "dedicated": infrastructure_comparison["dedicated"]["status"],
-    }, indent=2))
+    print(
+        json.dumps(
+            {
+                "timeout_recovered": _fault_recovered(timeout_case),
+                "timeout_mean_latency_ms": timeout_case["report"]["run"]["mean_latency_ms"],
+                "timeout_p95_latency_ms": timeout_case["report"]["run"]["p95_latency_ms"],
+                "truncation_recovered": _fault_recovered(truncation_case),
+                "truncation_p95_latency_ms": truncation_case["report"]["run"]["p95_latency_ms"],
+                "dual_failure_holds": dual_failure_holds,
+                "extended_stable": stability.stable,
+                "worst_trial_p95_ms": stability.worst_trial_p95_ms,
+                "decision": payload["executive_decision"]["decision"],
+                "dedicated": infrastructure_comparison["dedicated"]["status"],
+            },
+            indent=2,
+        )
+    )
 
 
 if __name__ == "__main__":

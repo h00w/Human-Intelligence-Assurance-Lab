@@ -1,4 +1,4 @@
-name: Phase 1.8 Adaptive Hedging
+name: Phase 1.8.2 Critical Resilience Reserve
 
 on:
   workflow_dispatch:
@@ -23,6 +23,9 @@ jobs:
       HIA_ADAPTIVE_FALLBACK: novita
       HIA_ADAPTIVE_TRIALS: '5'
       HIA_ADAPTIVE_FAULT_TRIALS: '3'
+      HIA_QUALIFICATION_EPOCH: critical-reserve-v1
+      HIA_ADAPTIVE_POLICY_VERSION: adaptive-1.8.2-critical-reserve
+      HIA_CRITICAL_MAX_HEDGE_MS: '1000'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -31,11 +34,11 @@ jobs:
           cache: pip
       - name: Install
         run: pip install -e .
-      - name: Run adaptive hedging qualification
+      - name: Run critical-reserve qualification
         run: python scripts/run_adaptive_hedging.py
-      - name: Upload Phase 1.8 evidence
+      - name: Upload Phase 1.8.2 evidence
         uses: actions/upload-artifact@v4
         with:
-          name: hia-phase-1-8-adaptive-hedging
+          name: hia-phase-1-8-2-critical-reserve
           path: artifacts/adaptive_hedging_latest.json
           retention-days: 30

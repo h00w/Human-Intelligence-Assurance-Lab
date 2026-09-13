@@ -71,6 +71,20 @@ class AdaptiveHedgePolicy:
         return self.delays_ms.get(risk_level, self.delays_ms["medium"])
 
 
+def fallback_timeout_budget_s(
+    hedge_delay_ms: float,
+    *,
+    p95_slo_ms: float = 8000.0,
+    safety_margin_ms: float = 500.0,
+    min_timeout_s: float = 4.0,
+    max_timeout_s: float = 6.5,
+) -> float:
+    """Derive a fallback deadline that never rounds above the p95 envelope."""
+    available_ms = p95_slo_ms - hedge_delay_ms - safety_margin_ms
+    timeout_s = max(min_timeout_s, min(max_timeout_s, available_ms / 1000))
+    return math.floor(timeout_s * 1000) / 1000
+
+
 class AdaptiveHedgedAdapter(ModelAdapter):
     """Risk-aware hedging using delays derived from measured primary latency."""
 

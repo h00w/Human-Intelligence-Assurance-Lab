@@ -22,6 +22,7 @@ jobs:
       HIA_ADAPTIVE_PRIMARY: nscale
       HIA_ADAPTIVE_FALLBACK: novita
       HIA_ADAPTIVE_TRIALS: '5'
+      HIA_ADAPTIVE_FAULT_TRIALS: '3'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

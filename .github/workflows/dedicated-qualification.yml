@@ -1,0 +1,30 @@
+name: Dedicated Endpoint Qualification
+
+on:
+  workflow_dispatch:
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      HIA_DEDICATED_ENDPOINT: ${{ secrets.HIA_DEDICATED_ENDPOINT }}
+      HIA_DEDICATED_API_KEY: ${{ secrets.HIA_DEDICATED_API_KEY }}
+      HIA_DEDICATED_MODEL: ${{ vars.HIA_DEDICATED_MODEL }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install
+        run: pip install -e .
+      - name: Qualify explicit dedicated endpoint
+        run: python scripts/run_dedicated_qualification.py
+      - name: Upload qualification evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: dedicated-qualification
+          path: artifacts/dedicated_qualification_latest.json
+          retention-days: 30

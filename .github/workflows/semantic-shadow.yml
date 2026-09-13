@@ -4,12 +4,24 @@ on:
   workflow_dispatch:
     inputs:
       judge_model:
-        description: Hugging Face judge model id
+        description: Independent Hugging Face judge model id
         required: true
       judge_provider:
-        description: Hugging Face inference provider
+        description: Hugging Face inference provider for the judge
         required: false
         default: auto
+      candidate_model:
+        description: Candidate model to evaluate
+        required: false
+        default: meta-llama/Llama-3.1-8B-Instruct
+      candidate_provider:
+        description: Hugging Face inference provider for the candidate
+        required: false
+        default: deepinfra
+      per_domain:
+        description: Calibration cases per domain (4 = 24 total)
+        required: false
+        default: '4'
 
 jobs:
   judge:
@@ -20,6 +32,9 @@ jobs:
       HF_TOKEN: ${{ secrets.HF_TOKEN }}
       HIA_JUDGE_MODEL: ${{ inputs.judge_model }}
       HIA_JUDGE_PROVIDER: ${{ inputs.judge_provider }}
+      HIA_CANDIDATE_MODEL: ${{ inputs.candidate_model }}
+      HIA_CANDIDATE_PROVIDER: ${{ inputs.candidate_provider }}
+      HIA_CALIBRATION_PER_DOMAIN: ${{ inputs.per_domain }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

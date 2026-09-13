@@ -7,6 +7,12 @@
 [![Hugging Face Dataset](https://img.shields.io/badge/Hugging%20Face-Dataset-yellow)](https://huggingface.co/datasets/h0000w/Human-Intelligence-Assurance-Lab)
 [![Hugging Face Space](https://img.shields.io/badge/Hugging%20Face-Space-yellow)](https://huggingface.co/spaces/h0000w/Human-Intelligence-Assurance-Lab)
 
+<p align="center">
+  <a href="https://github.com/h00w/Human-Intelligence-Assurance-Lab">
+    <img src="https://raw.githubusercontent.com/h00w/h00w.github.io/refs/heads/main/public/hia-lab.png" alt="Human Intelligence Assurance Lab" width="100%">
+  </a>
+</p>
+
 > **Independent research and engineering portfolio project.** This repository is inspired by publicly described human-centered AI product directions. It does not use proprietary BalanX-Bio data, source code, models, confidential information, or internal architecture.
 
 ## What HIA-Lab proves

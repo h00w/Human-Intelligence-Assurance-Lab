@@ -12,7 +12,7 @@ suggested_hardware: cpu-basic
 
 # Human Intelligence Assurance Lab
 
-Interactive control center for **HIA-Bench v0.1**, real-model release gating, repeated-run production confidence, provider resilience, fault injection, and hedged-request qualification.
+Interactive control center for **HIA-Bench v0.1**, real-model release gating, repeated-run production confidence, provider resilience, fault injection, hedged recovery, and adaptive cost-aware routing.
 
 The Streamlit Space is multipage:
 
@@ -20,28 +20,51 @@ The Streamlit Space is multipage:
 - **Production Confidence** exposes the Phase 1.4 repeated-run HOLD study and executive assurance evidence;
 - **Provider Resilience** exposes the Phase 1.5 provider bakeoff and repeated production-SHIP qualification;
 - **Fault Injection** exposes the authoritative Phase 1.6 sequential-fallback HOLD study;
-- **Hedged Requests** exposes the Phase 1.7 hedge-threshold bakeoff, live timeout/truncation recovery, repeated qualification, and routed-vs-dedicated infrastructure state.
+- **Hedged Requests** exposes the Phase 1.7 fixed-delay hedge bakeoff and recovery qualification;
+- **Adaptive Hedging** exposes the Phase 1.8 percentile-derived risk-aware hedge schedule, adaptive-vs-fixed token/cost overhead, repeated critical timeout recovery, and dedicated-infrastructure status.
 
-## Current result — Phase 1.7 SHIP
+## Current result — Phase 1.8 SHIP
 
-Phase 1.6 showed that sequential recovery after a complete 4-second Nscale timeout was behaviorally safe but averaged **5.252 s**, exceeding the unchanged **5-second mean-latency SLO**. Phase 1.7 changed the routing architecture instead of relaxing the SLO.
+Phase 1.8 replaces the fixed 1.5-second hedge with a routing policy derived from the current measured Nscale latency distribution and scenario risk.
 
-The selected hedge threshold is **1.5 s**. Under a forced 4-second Nscale timeout, Novita was launched early and won 100% of cases:
+Authoritative hedge delays:
 
-- behavioral **SHIP**;
-- production **SHIP**;
-- 100% pass rate;
-- 0 blockers, final provider errors, or unrecovered truncations;
-- mean decision latency **2.762 s**;
-- p95 decision latency **3.604 s**.
+- critical: **1.223 s**
+- high: **1.323 s**
+- medium: **1.505 s**
+- low: **2.105 s**
 
-Forced truncation recovery also produced production **SHIP** at **2.426 s mean / 3.352 s p95**, while simultaneous Nscale + Novita degradation still failed closed.
+The Novita fallback deadline is derived from the unchanged 8-second p95 envelope. In the authoritative run it was **6.276 s**, retaining a 500 ms safety margin after the critical hedge threshold.
 
-The selected hedge configuration then passed **10 trials / 120 real generations** with 100% behavioral and production SHIP recurrence, zero blocker/error/truncation trials, mean latency **1.217 s**, and worst trial p95 **2.837 s**.
+### Adaptive vs fixed routing
 
-The threshold bakeoff also exposes duplicate-work trade-offs: 0.5 s hedged 100% of healthy requests, 1.0 s hedged 66.67%, while the selected 1.5 s threshold hedged only 8.33% in its bakeoff run.
+Both policies achieved production **SHIP**, but adaptive routing reduced duplicate work in the measured 24-case comparison:
+
+- redundant-token rate: **17.66% adaptive** vs 29.94% fixed;
+- redundant tokens: **1,456** vs 2,915;
+- redundant cost: **$0.00005621** vs $0.00011488;
+- redundant-cost rate: **12.13%** vs 21.92%.
+
+Cost evidence is an optimization signal only. It never overrides blockers, truncations, provider errors, or operational SLO failures.
+
+### Repeated critical primary-timeout recovery
+
+Three independent critical-fault trials were required to pass after forcing the Nscale primary into a 4-second timeout:
+
+- trial 1: **SHIP**, 2.220 s mean / 2.464 s p95;
+- trial 2: **SHIP**, 2.638 s mean / 5.114 s p95;
+- trial 3: **SHIP**, 2.272 s mean / 2.624 s p95;
+- final provider errors: **0 in every trial**.
+
+The earlier Phase 1.8 HOLD is intentionally retained as superseded evidence: one real Novita request hit its own 4-second `ReadTimeout`. The hardened qualification derives the fallback deadline from the unchanged p95 budget and repeats the fault study rather than rerolling one case.
+
+Healthy repeated qualification also passed and remained stable.
+
+**Phase 1.8 executive decision: SHIP** for the tested model, policy, provider routes, benchmark, configuration, pricing snapshot, injected-fault model, and observation window.
 
 A dedicated endpoint remains **NOT_CONFIGURED**. HIA-Lab does not silently provision paid inference infrastructure; routed-vs-dedicated comparison remains non-release-critical until an endpoint is explicitly supplied.
+
+Machine-readable evidence: `runs/adaptive_hedging_latest.json` in the HIA-Lab Dataset and storage bucket.
 
 ## Runtime
 

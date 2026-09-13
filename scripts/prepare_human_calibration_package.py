@@ -86,13 +86,15 @@ def write_queue(rows: list[dict[str, str]]) -> None:
 
 def load_queue(token: str | None) -> tuple[list[dict[str, str]], dict[str, object]]:
     if QUEUE.exists():
-        rows = list(csv.DictReader(QUEUE.open(encoding="utf-8", newline="")))
+        with QUEUE.open(encoding="utf-8", newline="") as handle:
+            rows = list(csv.DictReader(handle))
         validate_frozen_queue(rows)
         return rows, {"source": str(QUEUE), "mode": "local_existing"}
 
     try:
         local = hf_hub_download(DATASET_REPO, REMOTE_QUEUE, repo_type="dataset", token=token)
-        rows = list(csv.DictReader(Path(local).open(encoding="utf-8", newline="")))
+        with Path(local).open(encoding="utf-8", newline="") as handle:
+            rows = list(csv.DictReader(handle))
         validate_frozen_queue(rows)
         write_queue(rows)
         return rows, {"source": REMOTE_QUEUE, "mode": "remote_existing"}

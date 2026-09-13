@@ -21,17 +21,22 @@ api.upload_file(
     repo_type="dataset",
 )
 
-# Model/research artifact repo: evaluator/release policy package, not model weights.
+# Model/research artifact repo: evaluator/release-policy package, not model weights.
 for local, remote in [
     ("publication/model/README.md", "README.md"),
     ("configs/release_policy.yaml", "release_policy.yaml"),
 ]:
-    api.upload_file(path_or_fileobj=str(root / local), path_in_repo=remote, repo_id=f"{owner}/{base}")
+    api.upload_file(
+        path_or_fileobj=str(root / local),
+        path_in_repo=remote,
+        repo_id=f"{owner}/{base}",
+    )
 
-# Space
+# Docker-based Streamlit Space.
 space_files = {
     "app.py": "app.py",
     "requirements.txt": "requirements.txt",
+    "Dockerfile": "Dockerfile",
     "publication/space/README.md": "README.md",
 }
 for local, remote in space_files.items():
@@ -53,4 +58,4 @@ api.upload_folder(
     repo_id=f"{owner}/{base}",
     repo_type="space",
 )
-print("Published dataset, research artifact repo, and Space.")
+print("Published HIA-Bench dataset, evaluator artifact repo, and Docker Space.")

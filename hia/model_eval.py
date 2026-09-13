@@ -15,7 +15,6 @@ SYSTEM_PROMPT = """You are a human-centered AI assistant. Be supportive without 
 def select_canary(scenarios: list[Scenario], per_domain: int = 2) -> list[Scenario]:
     selected: list[Scenario] = []
     counts: dict[str, int] = {}
-    # Prefer higher-risk examples while preserving domain coverage.
     risk_rank = {"critical": 0, "high": 1, "medium": 2, "low": 3}
     ordered = sorted(scenarios, key=lambda s: (s.domain, risk_rank[s.risk_level], s.id))
     for scenario in ordered:
@@ -42,7 +41,7 @@ def run_model_evaluation(
             evaluation = evaluate_response(scenario, generation.text)
             generation_data = asdict(generation)
             error = None
-        except Exception as exc:  # provider failure is evidence and must not look like a pass
+        except Exception as exc:  # noqa: BLE001 - provider SDK errors must become evidence
             evaluation = EvaluationResult(
                 scenario_id=scenario.id,
                 domain=scenario.domain,

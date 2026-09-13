@@ -9,6 +9,8 @@ from huggingface_hub.errors import HfHubHTTPError
 
 from hia.runner import run_demo
 
+DATASET_REPO = "h0000w/Human-Intelligence-Assurance-Lab"
+
 st.set_page_config(page_title="Human Intelligence Assurance Lab", page_icon="🧭", layout="wide")
 st.title("Human Intelligence Assurance Lab")
 st.caption("HIA-Bench v0.1 · Emotional Intelligence Assurance & Production Release Gate")
@@ -18,24 +20,26 @@ scenarios, results, report = run_demo()
 
 def _load_dataset_json(filename: str):
     try:
-        path = hf_hub_download(
-            repo_id="h0000w/Human-Intelligence-Assurance-Lab",
-            repo_type="dataset",
-            filename=filename,
-        )
+        path = hf_hub_download(repo_id=DATASET_REPO, repo_type="dataset", filename=filename)
         with open(path, encoding="utf-8") as handle:
             return json.load(handle)
     except (OSError, ValueError, HfHubHTTPError):
         return None
 
 
+def _ms(value):
+    return f"{value:.0f} ms" if value is not None else "n/a"
+
+
 live = _load_dataset_json("runs/live_eval_latest.json")
 bakeoff = _load_dataset_json("runs/model_bakeoff_latest.json")
 policy_ablation = _load_dataset_json("runs/policy_ablation_latest.json")
+latency = _load_dataset_json("runs/latency_tuning_latest.json")
 semantic = _load_dataset_json("runs/semantic_shadow_latest.json")
+calibration_report = _load_dataset_json("runs/calibration_report.json")
 
+st.subheader("Latest real-model canary")
 if live:
-    st.subheader("Latest real-model canary")
     run = live["run"]
     release = live["release_report"]
     production = live.get("production_decision")
@@ -44,17 +48,18 @@ if live:
     c2.metric("Behavioral", release["decision"])
     c3.metric("Production", production["decision"] if production else "legacy")
     c4.metric("Pass rate", f"{release['pass_rate']:.1%}")
-    c5.metric("Mean latency", f"{run['mean_latency_ms']:.0f} ms" if run["mean_latency_ms"] else "n/a")
+    c5.metric("Mean latency", _ms(run.get("mean_latency_ms")))
     cost = run.get("estimated_cost_usd")
     c6.metric("Est. run cost", f"${cost:.5f}" if cost is not None else "n/a")
 
     if production:
+        message = "; ".join(production["reasons"])
         if production["decision"] == "SHIP":
             st.success("Production SHIP — behavioral and operational gates passed.")
         elif production["decision"] == "INVESTIGATE":
-            st.warning("Production INVESTIGATE — " + "; ".join(production["reasons"]))
+            st.warning("Production INVESTIGATE — " + message)
         else:
-            st.error("Production HOLD — " + "; ".join(production["reasons"]))
+            st.error("Production HOLD — " + message)
 
     if live.get("lineage"):
         st.caption(
@@ -64,15 +69,14 @@ if live:
 
     operational = live.get("operational_report")
     if operational:
+        o1, o2, o3 = st.columns(3)
+        o1.metric("p95 latency", _ms(run.get("p95_latency_ms")))
+        o2.metric("Provider errors", run.get("provider_errors", 0))
+        o3.metric("Truncations", run.get("completion_truncations", 0))
         if operational["passed"]:
             st.success("Operational regression gate passed.")
         else:
             st.warning("Operational regression evidence: " + "; ".join(operational["reasons"]))
-        o1, o2, o3 = st.columns(3)
-        p95 = run.get("p95_latency_ms")
-        o1.metric("p95 latency", f"{p95:.0f} ms" if p95 is not None else "n/a")
-        o2.metric("Provider errors", run.get("provider_errors", 0))
-        o3.metric("Truncations", run.get("completion_truncations", 0))
 
     live_domains = pd.DataFrame(
         [{"domain": key, "pass_rate": value} for key, value in release["domain_pass_rates"].items()]
@@ -80,122 +84,137 @@ if live:
     st.bar_chart(live_domains)
 
     with st.expander("Real-model evidence"):
-        evidence_rows = []
-        for row in live["evidence"]:
-            evidence_rows.append(
-                {
-                    "scenario": row["scenario"]["id"],
-                    "domain": row["scenario"]["domain"],
-                    "risk": row["scenario"]["risk_level"],
-                    "passed": row["evaluation"]["passed"],
-                    "latency_ms": row["generation"]["latency_ms"],
-                    "violations": ", ".join(row["evaluation"]["violations"]),
-                    "response": row["generation"]["text"],
-                }
-            )
+        evidence_rows = [
+            {
+                "scenario": row["scenario"]["id"],
+                "domain": row["scenario"]["domain"],
+                "risk": row["scenario"]["risk_level"],
+                "passed": row["evaluation"]["passed"],
+                "latency_ms": row["generation"]["latency_ms"],
+                "violations": ", ".join(row["evaluation"]["violations"]),
+                "response": row["generation"]["text"],
+            }
+            for row in live["evidence"]
+        ]
         st.dataframe(pd.DataFrame(evidence_rows), use_container_width=True, hide_index=True)
 else:
     st.info("No published real-model run yet. The deterministic reference benchmark remains available below.")
 
-st.subheader("Phase 1.2.1 live model bakeoff")
+st.subheader("Phase 1.2.1 · Live model bakeoff")
 if bakeoff:
     baseline = bakeoff["baseline"]
     candidate = bakeoff["candidate"]
     comparison = bakeoff["comparison"]
-    b_run, b_release = baseline["run"], baseline["release_report"]
-    c_run, c_release = candidate["run"], candidate["release_report"]
-
     st.markdown(f"**Safety-first winner:** `{comparison['winner']}` — {'; '.join(comparison['rationale'])}")
-    compare_df = pd.DataFrame(
-        [
+    rows = []
+    for role, candidate_report in (("baseline", baseline), ("candidate", candidate)):
+        candidate_run = candidate_report["run"]
+        candidate_release = candidate_report["release_report"]
+        rows.append(
             {
-                "role": "baseline",
-                "model": b_run["model"],
-                "behavioral": b_release["decision"],
-                "production": baseline.get("production_decision", {}).get("decision", "legacy"),
-                "pass_rate": b_release["pass_rate"],
-                "blockers": b_release["blocker_failures"],
-                "truncations": b_run.get("completion_truncations", 0),
-                "mean_latency_ms": b_run.get("mean_latency_ms"),
-                "p95_latency_ms": b_run.get("p95_latency_ms"),
-            },
-            {
-                "role": "candidate",
-                "model": c_run["model"],
-                "behavioral": c_release["decision"],
-                "production": candidate.get("production_decision", {}).get("decision", "legacy"),
-                "pass_rate": c_release["pass_rate"],
-                "blockers": c_release["blocker_failures"],
-                "truncations": c_run.get("completion_truncations", 0),
-                "mean_latency_ms": c_run.get("mean_latency_ms"),
-                "p95_latency_ms": c_run.get("p95_latency_ms"),
-            },
-        ]
-    )
-    st.dataframe(compare_df, use_container_width=True, hide_index=True)
-    st.caption(
-        "Comparison is lexicographic: blocker failures and release status dominate quality, latency, and cost. "
-        "Semantic scores are excluded until human calibration requirements are met."
-    )
+                "role": role,
+                "model": candidate_run["model"],
+                "behavioral": candidate_release["decision"],
+                "production": candidate_report.get("production_decision", {}).get("decision", "legacy"),
+                "pass_rate": candidate_release["pass_rate"],
+                "blockers": candidate_release["blocker_failures"],
+                "truncations": candidate_run.get("completion_truncations", 0),
+                "mean_latency_ms": candidate_run.get("mean_latency_ms"),
+                "p95_latency_ms": candidate_run.get("p95_latency_ms"),
+            }
+        )
+    st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
 else:
     st.info("No two-model bakeoff has been published yet.")
 
-st.subheader("Phase 1.2.2 executable policy ablation")
+st.subheader("Phase 1.2.2 · Executable policy ablation")
 if policy_ablation:
-    generic = policy_ablation["generic_policy"]
-    aware = policy_ablation["risk_aware_policy"]
     comparison = policy_ablation["comparison"]
-    g_run, g_release = generic["run"], generic["release_report"]
-    a_run, a_release = aware["run"], aware["release_report"]
     st.markdown(f"**Policy winner:** `{comparison['winner']}` — {'; '.join(comparison['rationale'])}")
-    st.dataframe(
-        pd.DataFrame(
-            [
-                {
-                    "policy": "generic",
-                    "behavioral": g_release["decision"],
-                    "production": generic.get("production_decision", {}).get("decision", "legacy"),
-                    "pass_rate": g_release["pass_rate"],
-                    "blockers": g_release["blocker_failures"],
-                    "truncations": g_run.get("completion_truncations", 0),
-                    "mean_latency_ms": g_run.get("mean_latency_ms"),
-                    "p95_latency_ms": g_run.get("p95_latency_ms"),
-                    "lineage": generic["lineage"]["fingerprint"],
-                },
-                {
-                    "policy": "risk-aware",
-                    "behavioral": a_release["decision"],
-                    "production": aware.get("production_decision", {}).get("decision", "legacy"),
-                    "pass_rate": a_release["pass_rate"],
-                    "blockers": a_release["blocker_failures"],
-                    "truncations": a_run.get("completion_truncations", 0),
-                    "mean_latency_ms": a_run.get("mean_latency_ms"),
-                    "p95_latency_ms": a_run.get("p95_latency_ms"),
-                    "lineage": aware["lineage"]["fingerprint"],
-                },
-            ]
-        ),
-        use_container_width=True,
-        hide_index=True,
-    )
-    st.caption(
-        "Model, provider, benchmark, and generation parameters are held constant. Only the executable policy "
-        "overlay changes. A behavioral SHIP still requires the composite operational gate before production SHIP."
-    )
+    rows = []
+    for policy_name, key in (("generic", "generic_policy"), ("risk-aware", "risk_aware_policy")):
+        candidate_report = policy_ablation[key]
+        candidate_run = candidate_report["run"]
+        candidate_release = candidate_report["release_report"]
+        rows.append(
+            {
+                "policy": policy_name,
+                "behavioral": candidate_release["decision"],
+                "production": candidate_report.get("production_decision", {}).get("decision", "legacy"),
+                "pass_rate": candidate_release["pass_rate"],
+                "blockers": candidate_release["blocker_failures"],
+                "truncations": candidate_run.get("completion_truncations", 0),
+                "mean_latency_ms": candidate_run.get("mean_latency_ms"),
+                "p95_latency_ms": candidate_run.get("p95_latency_ms"),
+                "lineage": candidate_report["lineage"]["fingerprint"],
+            }
+        )
+    st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
 else:
     st.info("No executable-policy ablation has been published yet.")
 
-st.subheader("Phase 1.2 semantic quality calibration")
+st.subheader("Phase 1.3 · Production SLO closure")
+if latency:
+    selection = latency["selection"]
+    winner = selection.get("winner")
+    if selection["decision"] == "SHIP":
+        st.success(
+            f"Production SHIP — selected `{winner}`. "
+            + "; ".join(selection.get("rationale", []))
+        )
+    else:
+        st.warning("No generation profile satisfied every production gate.")
+
+    profile_rows = []
+    for name, profile in latency["profiles"].items():
+        profile_report = profile["report"]
+        profile_run = profile_report["run"]
+        profile_release = profile_report["release_report"]
+        production = profile_report["production_decision"]
+        profile_rows.append(
+            {
+                "profile": name,
+                "selected": name == winner,
+                "max_tokens": profile["generation"]["max_tokens"],
+                "behavioral": profile_release["decision"],
+                "production": production["decision"],
+                "pass_rate": profile_release["pass_rate"],
+                "blockers": profile_release["blocker_failures"],
+                "provider_errors": profile_run.get("provider_errors", 0),
+                "truncations": profile_run.get("completion_truncations", 0),
+                "mean_latency_ms": profile_run.get("mean_latency_ms"),
+                "p95_latency_ms": profile_run.get("p95_latency_ms"),
+                "tokens": profile_run.get("total_tokens"),
+            }
+        )
+    st.dataframe(pd.DataFrame(profile_rows), use_container_width=True, hide_index=True)
+
+    if winner:
+        winner_run = latency["profiles"][winner]["report"]["run"]
+        p1, p2, p3, p4 = st.columns(4)
+        p1.metric("Selected profile", winner)
+        p2.metric("Mean latency", _ms(winner_run.get("mean_latency_ms")))
+        p3.metric("p95 latency", _ms(winner_run.get("p95_latency_ms")))
+        p4.metric("Production SLO", "≤ 8,000 ms p95")
+    st.caption(
+        "Generation budget is treated as an experiment, not an assumed optimization. "
+        "A faster profile cannot compensate for a behavioral blocker, provider error, or truncation."
+    )
+else:
+    st.info("No Phase 1.3 latency-tuning evidence has been published yet.")
+
+st.subheader("Semantic quality calibration")
 if semantic:
     calibration = semantic.get("calibration", {})
     scores = semantic.get("scores", [])
-    s1, s2, s3 = st.columns(3)
+    s1, s2, s3, s4 = st.columns(4)
     s1.metric("Judge mode", semantic.get("mode", "shadow").upper())
     s2.metric("Judge model", semantic.get("judge_model", "n/a"))
-    s3.metric("Calibration", calibration.get("status", "UNKNOWN"))
+    s3.metric("Review queue", calibration.get("review_queue_size", len(scores)))
+    s4.metric("Calibration", calibration.get("status", "UNKNOWN"))
     st.warning(
-        "Semantic judge results are shadow evidence and are not release-critical until independent "
-        "human-review calibration meets the configured agreement thresholds."
+        "Semantic judge results remain shadow evidence until independent human review meets "
+        "the configured agreement and critical-failure recall thresholds."
     )
     if scores:
         semantic_rows = pd.DataFrame(
@@ -214,9 +233,22 @@ if semantic:
         st.dataframe(semantic_rows, use_container_width=True, hide_index=True)
 else:
     st.info(
-        "Semantic judge has not been run yet. Trigger the manual Semantic Shadow Evaluation workflow with "
-        "an independent judge model; HIA-Lab will generate semantic evidence and a human-review queue."
+        "Semantic shadow evaluation is intentionally manual. Run it with an independent judge model to create "
+        "the 24-sample human-review queue."
     )
+
+if calibration_report:
+    scored = calibration_report["report"]
+    st.markdown("**Human calibration report**")
+    h1, h2, h3, h4 = st.columns(4)
+    h1.metric("Reviewed", scored["sample_count"])
+    h2.metric("Agreement", f"{scored['agreement']:.1%}")
+    h3.metric("Cohen's κ", f"{scored['cohen_kappa']:.3f}")
+    h4.metric("Critical recall", f"{scored['critical_recall']:.1%}")
+    if scored["calibrated"]:
+        st.success("Semantic judge calibration contract passed.")
+    else:
+        st.warning("Semantic judge remains shadow-only; calibration contract has not passed.")
 
 st.subheader("Deterministic reference adapter")
 c1, c2, c3, c4 = st.columns(4)
@@ -232,8 +264,6 @@ elif report.decision == "INVESTIGATE":
 else:
     st.error("HOLD — at least one hard safety or privacy gate failed.")
 
-st.write("\n".join(f"- {reason}" for reason in report.reasons))
-
 st.subheader("Reference domain pass rates")
 domain_df = pd.DataFrame(
     [{"domain": key, "pass_rate": value} for key, value in report.domain_pass_rates.items()]
@@ -241,25 +271,22 @@ domain_df = pd.DataFrame(
 st.bar_chart(domain_df)
 
 st.subheader("HIA-Bench scenario explorer")
-rows = []
 by_result = {result.scenario_id: result for result in results}
-for scenario in scenarios:
-    result = by_result[scenario.id]
-    rows.append(
-        {
-            "id": scenario.id,
-            "domain": scenario.domain,
-            "risk": scenario.risk_level,
-            "severity": scenario.release_severity,
-            "passed": result.passed,
-            "violations": ", ".join(result.violations),
-            "prompt": scenario.input.user_message,
-        }
-    )
+rows = [
+    {
+        "id": scenario.id,
+        "domain": scenario.domain,
+        "risk": scenario.risk_level,
+        "severity": scenario.release_severity,
+        "passed": by_result[scenario.id].passed,
+        "violations": ", ".join(by_result[scenario.id].violations),
+        "prompt": scenario.input.user_message,
+    }
+    for scenario in scenarios
+]
 st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
 
 st.info(
-    "HIA-Bench uses synthetic scenarios and auditable checks. Emotional-state fields are hypotheses, "
-    "not clinical labels or ground truth. Live model and semantic-judge results are evidence for this "
-    "benchmark only."
+    "HIA-Bench uses synthetic scenarios and auditable checks. Emotional-state fields are hypotheses, not clinical "
+    "labels or ground truth. Live model and semantic-judge results are evidence for this benchmark only."
 )

@@ -8,6 +8,7 @@ on:
     branches: [main]
     paths:
       - 'hia/drift.py'
+      - 'hia/authoritative.py'
       - 'scripts/run_long_window_qualification.py'
       - 'scripts/generate_v1_readiness_manifest.py'
       - '.github/workflows/long-window-qualification.yml'
@@ -33,8 +34,11 @@ jobs:
       - name: Install
         run: pip install -e .
       - name: Run fresh adaptive qualification
+        if: github.event_name != 'push'
         run: python scripts/run_adaptive_hedging.py
       - name: Archive time-separated evidence
+        id: archive
+        continue-on-error: true
         run: python scripts/run_long_window_qualification.py
       - name: Refresh Phase 1 v1 readiness manifest
         run: python scripts/generate_v1_readiness_manifest.py
@@ -46,3 +50,12 @@ jobs:
             artifacts/long_window_report.json
             artifacts/phase_1_v1_readiness.json
           retention-days: 30
+      - name: Enforce long-window verdict
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          status = json.loads(Path('artifacts/long_window_report.json').read_text())['status']
+          print(f'long-window status: {status}')
+          raise SystemExit(2 if status == 'HOLD' else 0)
+          PY

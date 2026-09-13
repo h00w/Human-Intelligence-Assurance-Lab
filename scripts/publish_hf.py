@@ -1,5 +1,6 @@
-from pathlib import Path
 import os
+from pathlib import Path
+
 from huggingface_hub import HfApi
 
 api = HfApi(token=os.environ["HF_TOKEN"])

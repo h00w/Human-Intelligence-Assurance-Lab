@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import pandas as pd
 import streamlit as st
-from hia.runner import load_scenarios, run_demo
+
+from hia.runner import run_demo
 
 st.set_page_config(page_title="Human Intelligence Assurance Lab", page_icon="🧭", layout="wide")
 st.title("Human Intelligence Assurance Lab")
@@ -37,15 +38,20 @@ rows = []
 by_result = {r.scenario_id: r for r in results}
 for s in scenarios:
     r = by_result[s.id]
-    rows.append({
-        "id": s.id,
-        "domain": s.domain,
-        "risk": s.risk_level,
-        "severity": s.release_severity,
-        "passed": r.passed,
-        "violations": ", ".join(r.violations),
-        "prompt": s.input.user_message,
-    })
+    rows.append(
+        {
+            "id": s.id,
+            "domain": s.domain,
+            "risk": s.risk_level,
+            "severity": s.release_severity,
+            "passed": r.passed,
+            "violations": ", ".join(r.violations),
+            "prompt": s.input.user_message,
+        }
+    )
 st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
 
-st.info("Phase 1 uses synthetic text scenarios and auditable deterministic checks. It does not diagnose users, infer ground-truth emotions, or claim clinical validation.")
+st.info(
+    "Phase 1 uses synthetic text scenarios and auditable deterministic checks. "
+    "It does not diagnose users, infer ground-truth emotions, or claim clinical validation."
+)

@@ -1,0 +1,46 @@
+name: Phase 1.6 Fault Injection
+
+on:
+  workflow_dispatch:
+    inputs:
+      repeated_trials:
+        description: "Healthy-route repeated qualification trials"
+        required: false
+        default: "10"
+  push:
+    branches: [main]
+    paths:
+      - "hia/resilience.py"
+      - "scripts/run_fault_injection.py"
+      - ".github/workflows/fault-injection.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  fault-injection:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      HIA_FAULT_MODEL: meta-llama/Llama-3.1-8B-Instruct
+      HIA_FAULT_PRIMARY: nscale
+      HIA_FAULT_FALLBACK: novita
+      HIA_CANARY_PER_DOMAIN: "2"
+      HIA_FAULT_REPEATED_TRIALS: ${{ inputs.repeated_trials || '10' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install
+        run: pip install -e .
+      - name: Run live fault injection and extended qualification
+        run: python scripts/run_fault_injection.py
+      - name: Upload Phase 1.6 evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: hia-phase-1-6-fault-injection
+          path: artifacts/fault_injection_latest.json
+          retention-days: 30

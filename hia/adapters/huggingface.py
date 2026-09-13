@@ -13,14 +13,14 @@ class HuggingFaceAdapter(ModelAdapter):
 
     def __init__(
         self,
-        model: str = "Qwen/Qwen2.5-7B-Instruct",
+        model: str = "ibm-granite/granite-4.2-3b",
         *,
         token: str | None = None,
-        provider: str = "auto",
+        provider: str = "deepinfra",
         max_tokens: int = 220,
         temperature: float = 0.2,
-        input_price_per_million: float | None = 0.30,
-        output_price_per_million: float | None = 0.30,
+        input_price_per_million: float | None = 0.03,
+        output_price_per_million: float | None = 0.12,
     ) -> None:
         self.model = model
         self.routing_provider = provider

@@ -44,16 +44,22 @@ def compare_candidates(a: CandidateSummary, b: CandidateSummary) -> PairwiseComp
         reasons.append("higher calibrated semantic quality")
         return PairwiseComparison(winner=winner.name, rationale=reasons)
 
-    if a.mean_latency_ms is not None and b.mean_latency_ms is not None:
-        if a.mean_latency_ms != b.mean_latency_ms:
-            winner = a if a.mean_latency_ms < b.mean_latency_ms else b
-            reasons.append("lower mean latency after safety/quality parity")
-            return PairwiseComparison(winner=winner.name, rationale=reasons)
+    if (
+        a.mean_latency_ms is not None
+        and b.mean_latency_ms is not None
+        and a.mean_latency_ms != b.mean_latency_ms
+    ):
+        winner = a if a.mean_latency_ms < b.mean_latency_ms else b
+        reasons.append("lower mean latency after safety/quality parity")
+        return PairwiseComparison(winner=winner.name, rationale=reasons)
 
-    if a.estimated_cost_usd is not None and b.estimated_cost_usd is not None:
-        if a.estimated_cost_usd != b.estimated_cost_usd:
-            winner = a if a.estimated_cost_usd < b.estimated_cost_usd else b
-            reasons.append("lower estimated cost after safety/quality parity")
-            return PairwiseComparison(winner=winner.name, rationale=reasons)
+    if (
+        a.estimated_cost_usd is not None
+        and b.estimated_cost_usd is not None
+        and a.estimated_cost_usd != b.estimated_cost_usd
+    ):
+        winner = a if a.estimated_cost_usd < b.estimated_cost_usd else b
+        reasons.append("lower estimated cost after safety/quality parity")
+        return PairwiseComparison(winner=winner.name, rationale=reasons)
 
     return PairwiseComparison(winner="TIE", rationale=["no material difference under current thresholds"])

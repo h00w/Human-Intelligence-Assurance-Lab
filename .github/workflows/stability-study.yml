@@ -1,0 +1,58 @@
+name: Phase 1.4 Production Confidence
+
+on:
+  workflow_dispatch:
+    inputs:
+      trials:
+        description: Repeated canary trials
+        required: false
+        default: '5'
+      model:
+        description: Hugging Face model id
+        required: false
+        default: meta-llama/Llama-3.1-8B-Instruct
+      provider:
+        description: Hugging Face inference provider
+        required: false
+        default: deepinfra
+  push:
+    branches: [main]
+    paths:
+      - 'hia/stability.py'
+      - 'hia/executive_assurance.py'
+      - 'scripts/run_stability_study.py'
+      - 'scripts/build_executive_manifest.py'
+      - '.github/workflows/stability-study.yml'
+
+jobs:
+  confidence:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      HIA_STABILITY_TRIALS: ${{ inputs.trials || '5' }}
+      HIA_STABILITY_MODEL: ${{ inputs.model || 'meta-llama/Llama-3.1-8B-Instruct' }}
+      HIA_STABILITY_PROVIDER: ${{ inputs.provider || 'deepinfra' }}
+      HIA_CANARY_PER_DOMAIN: '2'
+      HIA_STABILITY_MAX_TOKENS: '512'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install
+        run: pip install -e .
+      - name: Run repeated production-confidence study
+        run: python scripts/run_stability_study.py
+      - name: Build executive assurance manifest
+        run: python scripts/build_executive_manifest.py
+      - name: Upload Phase 1.4 evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: hia-phase-1-4-production-confidence
+          path: |
+            artifacts/stability_study_latest.json
+            artifacts/executive_assurance_manifest.json
+          retention-days: 30

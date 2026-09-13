@@ -15,6 +15,16 @@ on:
         description: Canary cases per domain
         required: false
         default: '2'
+  push:
+    branches: [main]
+    paths:
+      - 'hia/latency_tuning.py'
+      - 'scripts/run_latency_tuning.py'
+      - '.github/workflows/latency-tuning.yml'
+      - 'hia/model_eval.py'
+      - 'hia/policy.py'
+      - 'hia/operational.py'
+      - 'configs/phase_1_2.yaml'
 
 jobs:
   tune:

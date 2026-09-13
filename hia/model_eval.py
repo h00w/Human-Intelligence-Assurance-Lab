@@ -25,6 +25,17 @@ def select_canary(scenarios: list[Scenario], per_domain: int = 2) -> list[Scenar
     return selected
 
 
+def _apply_operational_checks(
+    evaluation: EvaluationResult,
+    generation_metadata: dict[str, Any],
+) -> EvaluationResult:
+    if generation_metadata.get("finish_reason") != "length":
+        return evaluation
+
+    violations = [*evaluation.violations, "completion_truncated"]
+    return evaluation.model_copy(update={"violations": violations, "passed": False})
+
+
 def run_model_evaluation(
     adapter: ModelAdapter,
     scenarios: list[Scenario],
@@ -39,6 +50,7 @@ def run_model_evaluation(
                 user_prompt=scenario.input.user_message,
             )
             evaluation = evaluate_response(scenario, generation.text)
+            evaluation = _apply_operational_checks(evaluation, generation.metadata)
             generation_data = asdict(generation)
             error = None
         except Exception as exc:  # noqa: BLE001 - provider SDK errors must become evidence
@@ -93,6 +105,10 @@ def run_model_evaluation(
         for row in successful
         if row["generation"]["total_tokens"] is not None
     ]
+    truncations = sum(
+        row["generation"].get("metadata", {}).get("finish_reason") == "length"
+        for row in successful
+    )
 
     return {
         "schema_version": "1.1",
@@ -103,6 +119,7 @@ def run_model_evaluation(
             "scenario_count": len(scenarios),
             "successful_generations": len(successful),
             "provider_errors": len(evidence) - len(successful),
+            "completion_truncations": truncations,
             "mean_latency_ms": round(sum(latencies) / len(latencies), 2) if latencies else None,
             "total_tokens": sum(total_tokens) if total_tokens else None,
             "estimated_cost_usd": round(sum(costs), 8) if costs else None,

@@ -1,4 +1,9 @@
-from hia.adaptive import AdaptiveHedgePolicy, cohort_metrics, routing_economics
+from hia.adaptive import (
+    AdaptiveHedgePolicy,
+    cohort_metrics,
+    fallback_timeout_budget_s,
+    routing_economics,
+)
 
 
 def test_adaptive_policy_hedges_critical_no_later_than_ordinary():
@@ -8,6 +13,12 @@ def test_adaptive_policy_hedges_critical_no_later_than_ordinary():
     assert policy.delay_for("medium") <= policy.delay_for("low")
     assert policy.delay_for("critical") >= 500
     assert policy.delay_for("low") <= 2500
+
+
+def test_fallback_timeout_budget_preserves_p95_margin():
+    timeout_s = fallback_timeout_budget_s(1262.32)
+    assert timeout_s == 6.238
+    assert 1262.32 + timeout_s * 1000 + 500 <= 8000.01
 
 
 def test_routing_economics_counts_redundant_work():

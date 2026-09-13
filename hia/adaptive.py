@@ -71,6 +71,25 @@ class AdaptiveHedgePolicy:
         return self.delays_ms.get(risk_level, self.delays_ms["medium"])
 
 
+def fallback_timeout_budget_s(
+    hedge_delay_ms: float,
+    *,
+    p95_slo_ms: float = 8000.0,
+    safety_margin_ms: float = 500.0,
+    min_timeout_s: float = 4.0,
+    max_timeout_s: float = 6.5,
+) -> float:
+    """Derive the fallback request deadline from the end-to-end p95 budget.
+
+    The fallback starts after ``hedge_delay_ms``. Its request deadline is bounded so the
+    configured path still leaves a fixed safety margin before the 8-second production p95
+    ceiling. The production gate remains authoritative if actual latency violates the SLO.
+    """
+    available_ms = p95_slo_ms - hedge_delay_ms - safety_margin_ms
+    timeout_s = available_ms / 1000
+    return round(max(min_timeout_s, min(max_timeout_s, timeout_s)), 3)
+
+
 class AdaptiveHedgedAdapter(ModelAdapter):
     """Risk-aware hedging using delays derived from measured primary latency."""
 

@@ -4,6 +4,12 @@ on:
   workflow_dispatch:
   schedule:
     - cron: '15 3 * * 0'
+  push:
+    branches: [main]
+    paths:
+      - 'hia/drift.py'
+      - 'scripts/run_long_window_qualification.py'
+      - '.github/workflows/long-window-qualification.yml'
 
 jobs:
   qualify:

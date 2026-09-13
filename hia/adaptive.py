@@ -26,6 +26,8 @@ class AdaptiveHedgePolicy:
     delays_ms: dict[str, float]
     min_delay_ms: float = 500.0
     max_delay_ms: float = 2500.0
+    critical_max_delay_ms: float | None = None
+    policy_version: str = "adaptive-1.8"
 
     @classmethod
     def from_latencies(
@@ -34,6 +36,8 @@ class AdaptiveHedgePolicy:
         *,
         min_delay_ms: float = 500.0,
         max_delay_ms: float = 2500.0,
+        critical_max_delay_ms: float | None = None,
+        policy_version: str = "adaptive-1.8",
     ) -> AdaptiveHedgePolicy:
         if len(latencies_ms) < 4:
             raise ValueError("adaptive hedge policy requires at least four latency samples")
@@ -54,8 +58,12 @@ class AdaptiveHedgePolicy:
         def bounded(value: float) -> float:
             return round(max(min_delay_ms, min(max_delay_ms, value)), 2)
 
+        critical = bounded(profile.p50_ms)
+        if critical_max_delay_ms is not None:
+            critical = round(max(min_delay_ms, min(critical, critical_max_delay_ms)), 2)
+
         delays = {
-            "critical": bounded(profile.p50_ms),
+            "critical": critical,
             "high": bounded(profile.p75_ms),
             "medium": bounded(profile.p90_ms),
             "low": bounded(profile.p95_ms),
@@ -65,6 +73,8 @@ class AdaptiveHedgePolicy:
             delays_ms=delays,
             min_delay_ms=min_delay_ms,
             max_delay_ms=max_delay_ms,
+            critical_max_delay_ms=critical_max_delay_ms,
+            policy_version=policy_version,
         )
 
     def delay_for(self, risk_level: str) -> float:
@@ -116,8 +126,10 @@ class AdaptiveHedgedAdapter(ModelAdapter):
         metadata.update(
             {
                 "adaptive_hedging": True,
+                "adaptive_policy_version": self.policy.policy_version,
                 "scenario_risk_level": risk,
                 "adaptive_hedge_delay_ms": delay_ms,
+                "critical_max_delay_ms": self.policy.critical_max_delay_ms,
                 "latency_profile": {
                     "sample_count": self.policy.latency.sample_count,
                     "p50_ms": self.policy.latency.p50_ms,

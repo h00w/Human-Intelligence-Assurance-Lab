@@ -1,0 +1,32 @@
+name: Publish Hugging Face
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'evals/**'
+      - 'hia/**'
+      - 'app.py'
+      - 'Dockerfile'
+      - 'requirements.txt'
+      - 'configs/**'
+      - 'publication/**'
+      - 'scripts/publish_hf.py'
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install publisher
+        run: pip install 'huggingface_hub>=0.24,<1'
+      - name: Publish artifacts
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: python scripts/publish_hf.py

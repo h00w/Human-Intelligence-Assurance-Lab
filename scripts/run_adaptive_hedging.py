@@ -26,6 +26,9 @@ ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "artifacts" / "adaptive_hedging_latest.json"
 DATASET_REPO = "h0000w/Human-Intelligence-Assurance-Lab"
 BUCKET = "h0000w/Human-Intelligence-Assurance-Lab-storage"
+DEFAULT_EPOCH = "critical-reserve-v1"
+DEFAULT_POLICY_VERSION = "adaptive-1.8.2-critical-reserve"
+DEFAULT_CRITICAL_MAX_DELAY_MS = 1000.0
 PRICING = {
     "nscale": {"input": 0.06, "output": 0.06},
     "novita": {"input": 0.02, "output": 0.05},
@@ -84,6 +87,12 @@ def main() -> None:
     fallback = os.getenv("HIA_ADAPTIVE_FALLBACK", "novita")
     repeated_trials = int(os.getenv("HIA_ADAPTIVE_TRIALS", "5"))
     fault_trials = int(os.getenv("HIA_ADAPTIVE_FAULT_TRIALS", "3"))
+    epoch = os.getenv("HIA_QUALIFICATION_EPOCH", DEFAULT_EPOCH)
+    policy_version = os.getenv("HIA_ADAPTIVE_POLICY_VERSION", DEFAULT_POLICY_VERSION)
+    critical_max_delay_ms = float(
+        os.getenv("HIA_CRITICAL_MAX_HEDGE_MS", str(DEFAULT_CRITICAL_MAX_DELAY_MS))
+    )
+
     all_scenarios = load_scenarios()
     eval_scenarios = balanced_risk_sample(all_scenarios, per_risk=6)
     calibration_scenarios = select_canary(all_scenarios, per_domain=2)
@@ -94,7 +103,11 @@ def main() -> None:
         calibration_scenarios,
         system_prompt_builder=risk_aware_system_prompt,
     )
-    policy = AdaptiveHedgePolicy.from_latencies(latencies(calibration))
+    policy = AdaptiveHedgePolicy.from_latencies(
+        latencies(calibration),
+        critical_max_delay_ms=critical_max_delay_ms,
+        policy_version=policy_version,
+    )
     critical_delay_ms = policy.delay_for("critical")
     fallback_timeout_s = fallback_timeout_budget_s(critical_delay_ms)
 
@@ -159,10 +172,23 @@ def main() -> None:
     executive_ship = eligible(adaptive_report) and fault_pass and stability.stable
 
     payload = {
-        "schema_version": "1.8.1",
-        "purpose": "adaptive hedging, cost-aware routing, and repeated critical recovery",
+        "schema_version": "1.8.2",
+        "qualification_epoch": epoch,
+        "policy_version": policy_version,
+        "purpose": "critical resilience reserve after observed fallback timeout",
         "model": model,
         "routes": {"primary": primary, "fallback": fallback},
+        "remediation": {
+            "trigger": "2026-09-13 longitudinal critical recovery HOLD: one Novita ReadTimeout during forced Nscale outage",
+            "critical_max_hedge_ms": critical_max_delay_ms,
+            "slo_equation_ms": {
+                "critical_hedge": critical_delay_ms,
+                "fallback_timeout": round(fallback_timeout_s * 1000, 3),
+                "reserve": 500.0,
+                "p95_limit": 8000.0,
+            },
+            "previous_hold_preserved": True,
+        },
         "pricing_snapshot": {
             "date": "2026-09-13",
             "source": "Hugging Face Inference Providers catalog",
@@ -180,8 +206,10 @@ def main() -> None:
             "scenario_count": calibration["run"]["scenario_count"],
             "latency_profile": asdict(policy.latency),
             "derived_delays_ms": policy.delays_ms,
+            "critical_max_delay_ms": policy.critical_max_delay_ms,
+            "policy_version": policy.policy_version,
             "fallback_timeout_s": fallback_timeout_s,
-            "fallback_timeout_derivation": "p95 SLO - critical hedge delay - 500 ms margin",
+            "fallback_timeout_derivation": "8 s p95 SLO - critical hedge delay - 500 ms reserve, capped at 6.5 s",
             "report": calibration,
         },
         "comparison": {
@@ -198,6 +226,7 @@ def main() -> None:
             "critical_delay_ms": critical_delay_ms,
             "fallback_timeout_s": fallback_timeout_s,
             "trial_count": fault_trials,
+            "scenario_count_per_trial": len(critical_cases),
             "all_passed": fault_pass,
             "trials": fault_reports,
         },
@@ -232,18 +261,30 @@ def main() -> None:
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
     api = HfApi(token=token)
-    api.upload_file(
-        path_or_fileobj=str(OUT),
-        path_in_repo="runs/adaptive_hedging_latest.json",
-        repo_id=DATASET_REPO,
-        repo_type="dataset",
+    remote = f"runs/epochs/{epoch}/adaptive_hedging_latest.json"
+    for path in ("runs/adaptive_hedging_latest.json", remote):
+        api.upload_file(
+            path_or_fileobj=str(OUT),
+            path_in_repo=path,
+            repo_id=DATASET_REPO,
+            repo_type="dataset",
+        )
+    batch_bucket_files(
+        BUCKET,
+        add=[
+            (str(OUT), "runs/adaptive_hedging_latest.json"),
+            (str(OUT), remote),
+        ],
+        token=token,
     )
-    batch_bucket_files(BUCKET, add=[(str(OUT), "runs/adaptive_hedging_latest.json")], token=token)
 
     print(
         json.dumps(
             {
+                "qualification_epoch": epoch,
+                "policy_version": policy_version,
                 "derived_delays_ms": policy.delays_ms,
+                "critical_max_delay_ms": critical_max_delay_ms,
                 "fallback_timeout_s": fallback_timeout_s,
                 "adaptive": {
                     "production": adaptive_report["production_decision"]["decision"],

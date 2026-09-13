@@ -1,0 +1,51 @@
+name: Policy Injection Ablation
+
+on:
+  workflow_dispatch:
+    inputs:
+      model:
+        description: Hugging Face model id
+        required: false
+        default: meta-llama/Llama-3.1-8B-Instruct
+      provider:
+        description: Hugging Face inference provider
+        required: false
+        default: deepinfra
+      per_domain:
+        description: Canary cases per domain
+        required: false
+        default: '2'
+  push:
+    branches: [main]
+    paths:
+      - 'hia/policy.py'
+      - 'hia/model_eval.py'
+      - 'scripts/run_policy_ablation.py'
+      - '.github/workflows/policy-ablation.yml'
+
+jobs:
+  ablation:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      HIA_POLICY_MODEL: ${{ inputs.model || 'meta-llama/Llama-3.1-8B-Instruct' }}
+      HIA_POLICY_PROVIDER: ${{ inputs.provider || 'deepinfra' }}
+      HIA_CANARY_PER_DOMAIN: ${{ inputs.per_domain || '2' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install
+        run: pip install -e .
+      - name: Run policy injection ablation
+        run: python scripts/run_policy_ablation.py
+      - name: Upload ablation evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: hia-policy-ablation
+          path: artifacts/policy_ablation_latest.json
+          retention-days: 30

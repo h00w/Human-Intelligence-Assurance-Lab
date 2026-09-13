@@ -7,6 +7,7 @@ on:
     paths:
       - 'hia/adapters/dedicated.py'
       - 'scripts/run_dedicated_qualification.py'
+      - 'scripts/generate_v1_readiness_manifest.py'
       - '.github/workflows/dedicated-qualification.yml'
 
 jobs:
@@ -29,9 +30,13 @@ jobs:
         run: pip install -e .
       - name: Qualify explicit dedicated endpoint
         run: python scripts/run_dedicated_qualification.py
+      - name: Refresh Phase 1 v1 readiness manifest
+        run: python scripts/generate_v1_readiness_manifest.py
       - name: Upload qualification evidence
         uses: actions/upload-artifact@v4
         with:
           name: dedicated-qualification
-          path: artifacts/dedicated_qualification_latest.json
+          path: |
+            artifacts/dedicated_qualification_latest.json
+            artifacts/phase_1_v1_readiness.json
           retention-days: 30

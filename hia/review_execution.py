@@ -4,9 +4,8 @@ import csv
 import hashlib
 import io
 from collections import defaultdict
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
-from typing import Iterable, Mapping
-
 
 REVIEWER_FIELDS = (
     "sample_id",
@@ -257,7 +256,6 @@ def apply_adjudications(
             raise ValueError(f"duplicate adjudication for {sample_id}")
         adjudications[sample_id] = value
 
-    disagreements: set[str] = set()
     grouped: dict[str, set[bool]] = defaultdict(set)
     for row in rows:
         sample_id = row["sample_id"]

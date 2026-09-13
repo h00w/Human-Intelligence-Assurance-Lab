@@ -62,7 +62,7 @@ class DedicatedEndpointAdapter(ModelAdapter):
             },
         )
         started = time.perf_counter()
-        with request.urlopen(req, timeout=self.timeout_s) as response:  # noqa: S310
+        with request.urlopen(req, timeout=self.timeout_s) as response:
             payload = json.loads(response.read().decode("utf-8"))
         latency_ms = (time.perf_counter() - started) * 1000
         choice = payload["choices"][0]

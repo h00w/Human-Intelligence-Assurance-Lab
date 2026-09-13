@@ -3,7 +3,7 @@
 **Production architecture for measurable, safe, emotionally aware, human-centered AI.**
 
 [![CI](https://github.com/h00w/Human-Intelligence-Assurance-Lab/actions/workflows/ci.yml/badge.svg)](https://github.com/h00w/Human-Intelligence-Assurance-Lab/actions/workflows/ci.yml)
-[![Phase 1.6 Fault Injection](https://github.com/h00w/Human-Intelligence-Assurance-Lab/actions/workflows/fault-injection.yml/badge.svg)](https://github.com/h00w/Human-Intelligence-Assurance-Lab/actions/workflows/fault-injection.yml)
+[![Phase 1.7 Hedged Requests](https://github.com/h00w/Human-Intelligence-Assurance-Lab/actions/workflows/hedged-requests.yml/badge.svg)](https://github.com/h00w/Human-Intelligence-Assurance-Lab/actions/workflows/hedged-requests.yml)
 [![Hugging Face Dataset](https://img.shields.io/badge/Hugging%20Face-Dataset-yellow)](https://huggingface.co/datasets/h0000w/Human-Intelligence-Assurance-Lab)
 [![Hugging Face Space](https://img.shields.io/badge/Hugging%20Face-Space-yellow)](https://huggingface.co/spaces/h0000w/Human-Intelligence-Assurance-Lab)
 
@@ -11,53 +11,80 @@
 
 ## What HIA-Lab proves
 
-Emotionally aware and longitudinal AI should not be released because it merely *sounds* empathetic. HIA-Lab converts human-centered AI requirements into executable benchmark contracts, deterministic safety gates, real-model evidence, controlled model/policy/provider experiments, operational SLOs, repeated-run qualification, fault injection, semantic-calibration workflows, and reproducible release lineage.
+Emotionally aware and longitudinal AI should not be released because it merely *sounds* empathetic. HIA-Lab converts human-centered requirements into executable benchmark contracts, deterministic safety gates, real-model evidence, controlled model/policy/provider experiments, operational SLOs, repeated-run qualification, fault injection, semantic-calibration workflows, and reproducible release lineage.
 
-The project deliberately allows later evidence to overturn earlier positive results. A fast or high-scoring configuration can never compensate for a safety blocker, incomplete response, missing evidence, or failed production SLO.
+The project deliberately allows later evidence to overturn earlier positive results. A fast or high-scoring configuration can never compensate for a blocker, incomplete response, missing evidence, or failed production SLO.
 
-## Current production evidence — Phase 1.6
+## Current production evidence — Phase 1.7
 
-Phase 1.5 selected **Nscale** as primary and **Novita** as fallback after a controlled provider bakeoff and achieved five consecutive production-SHIP trials. Phase 1.6 then tested the assumption that fallback would remain production-grade when the primary route actually fails.
+Phase 1.6 proved that the Phase 1.5 sequential fallback architecture recovered safety and completeness after a forced Nscale timeout, but averaged **5.252 s**, exceeding the unchanged **5.000 s mean-latency SLO**. The Phase 1.6 executive result was therefore **HOLD**.
 
-### Live fault injection
+Phase 1.7 changes the routing architecture rather than weakening the gate: if Nscale has not completed by the selected hedge threshold, Novita starts in parallel and the first complete response wins. The losing attempt is still observed during qualification so provider, completion, token/cost, and post-decision provenance are retained.
 
-The authoritative Phase 1.6 run charges the full **4.0-second primary timeout budget** before fallback latency. An earlier experimental run that treated the synthetic timeout as instantaneous is superseded and is not used for the release conclusion.
+### Hedge-threshold bakeoff
 
-| Fault case | Failover | Behavioral | Production | Mean | p95 | Conclusion |
-|---|---:|---|---|---:|---:|---|
-| Forced Nscale timeout → real Novita fallback | **100%** | **SHIP** | **INVESTIGATE** | **5.252 s** | **7.231 s** | Recovery works, mean SLO misses |
-| Forced Nscale truncation → real Novita fallback | **100%** | **SHIP** | **SHIP** | **2.498 s** | **4.479 s** | PASS |
-| Simultaneous Nscale + Novita degradation | attempted | HOLD | HOLD | n/a | n/a | Correct fail-closed behavior |
+Same Llama 3.1 8B model, risk-aware policy, 12-case high-risk canary, Nscale primary, Novita fallback, evaluator, generation budget, and production contract:
 
-The timeout case successfully returned complete, behaviorally safe responses through Novita with zero final blockers, provider errors, or truncations. However, the composite production gate correctly returned **INVESTIGATE** because mean end-to-end latency was **5.252 s**, above the unchanged **5.000 s mean-latency SLO**. The p95 remained below the 8-second limit at 7.231 s.
+| Hedge delay | Behavioral | Production | Mean | p95 | Hedge rate | Fallback wins |
+|---:|---|---|---:|---:|---:|---:|
+| 0.5 s | SHIP | SHIP | 1.194 s | 1.779 s | 100% | 0% |
+| 1.0 s | SHIP | SHIP | 1.240 s | 2.306 s | 66.67% | 0% |
+| **1.5 s** | **SHIP** | **SHIP** | **1.137 s** | **1.589 s** | **8.33%** | **0%** |
+| 2.0 s | SHIP | SHIP | 1.301 s | 2.781 s | 8.33% | 0% |
 
-Therefore the **Phase 1.6 executive decision is HOLD**. The SLO is intentionally not relaxed.
+**Selected hedge delay: 1.5 s.** It produced the lowest eligible p95 in this run while avoiding the heavy duplicate-work rate seen at shorter delays.
 
-### Extended healthy-route qualification
+### Forced 4-second primary timeout
 
-The healthy Nscale → Novita route was also expanded to **10 trials × 12 high-risk cases = 120 real generations**.
+Nscale was forced to consume its complete 4-second timeout while Novita launched after 1.5 seconds.
 
-| Qualification metric | Result |
+| Metric | Result |
 |---|---:|
-| Behavioral SHIP rate | **100%** |
-| Production SHIP rate | **100%** |
+| Behavioral decision | **SHIP** |
+| Production decision | **SHIP** |
+| Pass rate | **100%** |
+| Blockers | **0** |
+| Final provider errors | **0** |
+| Unrecovered truncations | **0** |
+| Mean decision latency | **2.762 s** |
+| p95 decision latency | **3.604 s** |
+| Hedge rate | **100%** |
+| Fallback winner rate | **100%** |
+
+This directly closes the Phase 1.6 timeout-recovery failure under the same `mean <= 5 s` and `p95 <= 8 s` production SLOs.
+
+### Forced truncation and dual degradation
+
+- forced primary truncation → real Novita fallback: behavioral **SHIP**, production **SHIP**, mean **2.426 s**, p95 **3.352 s**, 100% fallback wins, zero blockers/final errors/unrecovered truncations;
+- simultaneous Nscale + Novita degradation: correctly **HOLD**.
+
+Hedging never converts missing evidence into a releaseable response.
+
+### Extended qualification
+
+The selected 1.5-second hedge configuration was then run for **10 trials × 12 high-risk scenarios = 120 real generations**.
+
+| Metric | Result |
+|---|---:|
+| Production SHIP recurrence | **100%** |
+| Behavioral SHIP recurrence | **100%** |
 | Blocker-trial rate | **0%** |
 | Provider-error trial rate | **0%** |
 | Truncation-trial rate | **0%** |
-| Mean latency | **1.269 s** |
-| Mean latency 95% CI | **1.241–1.296 s** |
-| Median trial p95 | **2.455 s** |
-| Trial-p95 95% CI | **2.088–2.649 s** |
-| Worst observed trial p95 | **2.805 s** |
+| Mean latency | **1.217 s** |
+| Mean-latency 95% CI | **1.169–1.265 s** |
+| Median trial p95 | **1.866 s** |
+| Trial-p95 95% CI | **1.738–2.250 s** |
+| Worst observed trial p95 | **2.837 s** |
 | Stability verdict | **PASS** |
 
-Normal operation is stable in this observation window. Phase 1.6 remains HOLD specifically because **sequential recovery after a full 4-second timeout cannot satisfy the 5-second mean SLO**.
+**Phase 1.7 executive decision: SHIP.**
 
 ### Routed vs dedicated infrastructure
 
-Routed Hugging Face inference is measured. A dedicated endpoint is currently **NOT_CONFIGURED** and is explicitly non-release-critical.
+Routed hedged inference is **MEASURED**. Dedicated inference remains **NOT_CONFIGURED** and non-release-critical because no endpoint was explicitly provisioned.
 
-HIA-Lab does not silently provision paid infrastructure. If a dedicated endpoint is explicitly supplied later, it can be evaluated against the same model, benchmark, policy, evaluator, fault scenarios, and SLO contract.
+HIA-Lab does not silently create billable infrastructure. Once a dedicated endpoint is explicitly available, it should be evaluated against the same benchmark, model, policy, fault scenarios, evaluator, and SLO contract.
 
 ## Phase history
 
@@ -72,16 +99,13 @@ HIA-Lab does not silently provision paid infrastructure. If a dedicated endpoint
 - Empty responses and incomplete generations fail closed.
 
 ### Phase 1.2 — Model, policy, and semantic assurance
-- Live model bakeoff.
-- Executable policy ablation.
+- Live model bakeoff and policy ablation.
 - Composite behavioral + operational production gate.
 - Semantic judge remains **shadow-only** pending independent human calibration.
 
-Human calibration requires at least 20 genuine reviews, Cohen's kappa >=0.70, critical-failure recall >=0.95, and reviewer provenance. HIA-Lab does not fabricate human labels.
-
 ### Phase 1.3 — Single-run SLO closure
-- Risk-aware Llama configuration reached 100% behavioral pass and p95 6.50 s.
-- Later repeated evidence showed why one favorable run was not enough.
+- Risk-aware Llama configuration reached a favorable single-run production SHIP.
+- Later repeated evidence showed why one favorable run was insufficient.
 
 ### Phase 1.4 — Repeated-run production confidence
 - 5 trials / 60 generations.
@@ -96,16 +120,22 @@ Human calibration requires at least 20 genuine reviews, Cohen's kappa >=0.70, cr
 - Nscale selected primary; Novita fallback.
 - 5 trials / 60 generations: 100% production SHIP, zero blockers/errors/truncations, worst p95 2.70 s.
 - Executive decision: **SHIP**.
-- Limitation: fallback was configured but not exercised naturally.
 
 ### Phase 1.6 — Fault Injection & Infrastructure Qualification
-- Forced primary timeout with real fallback.
-- Forced primary truncation with real fallback.
+- Forced primary timeout and truncation with real fallback.
 - Simultaneous provider degradation test.
-- Full timeout-budget accounting in end-to-end latency.
-- Extended 10-trial / 120-generation healthy-route qualification.
-- Dedicated endpoint comparison contract without implicit paid provisioning.
-- Authoritative executive decision: **HOLD**, because timeout recovery mean latency exceeds the production SLO.
+- 10-trial / 120-generation healthy-route qualification.
+- Sequential timeout recovery: behavioral SHIP but mean 5.252 s > 5.000 s SLO.
+- Executive decision: **HOLD**.
+
+### Phase 1.7 — Hedged Requests & Dedicated Infrastructure Bakeoff
+- Controlled 0.5 / 1.0 / 1.5 / 2.0 s hedge-threshold bakeoff.
+- 1.5 s selected in the measured run.
+- Forced 4-second timeout recovery: 2.762 s mean / 3.604 s p95, production **SHIP**.
+- Forced truncation recovery: production **SHIP**.
+- Dual degradation still fails closed.
+- 10-trial / 120-generation repeated qualification: 100% production SHIP recurrence, worst p95 2.837 s.
+- Executive decision: **SHIP**.
 
 ## Production gate
 
@@ -131,6 +161,9 @@ repeated behavioral + operational PASS
 fault-injected recovery misses any production SLO
     -> HOLD for resilience qualification
 
+fault-injected recovery + repeated qualification PASS
+    -> PRODUCTION SHIP
+
 semantic judge
     -> shadow-only until human calibration passes
 ```
@@ -144,9 +177,13 @@ HIA-Bench
    │          ├── bounded critical-response control
    │          └── raw response + lineage
    │
-   ├── provider routing
-   │          ├── Nscale primary + deadline
-   │          └── Novita fallback + attempt provenance
+   ├── hedged provider routing
+   │          ├── Nscale primary
+   │          ├── hedge threshold
+   │          └── Novita parallel fallback
+   │
+   ├── first complete response decision
+   │          └── losing-attempt provenance retained
    │
    ├── deterministic safety gate
    ├── completeness gate
@@ -182,6 +219,7 @@ runs/
 ├── stability_study_latest.json
 ├── provider_resilience_latest.json
 ├── fault_injection_latest.json
+├── hedged_requests_latest.json
 ├── semantic_shadow_latest.json
 ├── human_review_queue.csv
 ├── calibration_report.json
@@ -208,9 +246,6 @@ Real-model experiments require `HF_TOKEN`.
 - [`docs/PHASE_1_SPEC.md`](docs/PHASE_1_SPEC.md)
 - [`docs/PHASE_1_1_REAL_MODEL_EVAL.md`](docs/PHASE_1_1_REAL_MODEL_EVAL.md)
 - [`docs/PHASE_1_2_SEMANTIC_CALIBRATION.md`](docs/PHASE_1_2_SEMANTIC_CALIBRATION.md)
-- [`docs/PHASE_1_2_1_MODEL_BAKEOFF.md`](docs/PHASE_1_2_1_MODEL_BAKEOFF.md)
-- [`docs/PHASE_1_2_2_POLICY_ABLATION.md`](docs/PHASE_1_2_2_POLICY_ABLATION.md)
-- [`docs/PHASE_1_2_3_COMPOSITE_PRODUCTION_GATE.md`](docs/PHASE_1_2_3_COMPOSITE_PRODUCTION_GATE.md)
 - [`docs/PHASE_1_3_LATENCY_AND_CALIBRATION.md`](docs/PHASE_1_3_LATENCY_AND_CALIBRATION.md)
 - [`docs/PHASE_1_4_PRODUCTION_CONFIDENCE.md`](docs/PHASE_1_4_PRODUCTION_CONFIDENCE.md)
 - [`docs/PHASE_1_4_RESULT.md`](docs/PHASE_1_4_RESULT.md)
@@ -218,17 +253,19 @@ Real-model experiments require `HF_TOKEN`.
 - [`docs/PHASE_1_5_RESULT.md`](docs/PHASE_1_5_RESULT.md)
 - [`docs/PHASE_1_6_FAULT_INJECTION.md`](docs/PHASE_1_6_FAULT_INJECTION.md)
 - [`docs/PHASE_1_6_RESULT.md`](docs/PHASE_1_6_RESULT.md)
+- [`docs/PHASE_1_7_HEDGED_REQUESTS.md`](docs/PHASE_1_7_HEDGED_REQUESTS.md)
+- [`docs/PHASE_1_7_RESULT.md`](docs/PHASE_1_7_RESULT.md)
 - [`evals/scenarios/hia_bench_v0_1.jsonl`](evals/scenarios/hia_bench_v0_1.jsonl)
 
 ## Next qualification milestone
 
-**Phase 1.7 — Hedged Requests & Dedicated Infrastructure Bakeoff:** test adaptive/hedged fallback so recovery can begin before the entire primary deadline is consumed, preserve cancellation/attempt provenance, qualify injected timeout recovery against the unchanged 5-second mean and 8-second p95 SLOs, and compare routed inference with an explicitly provisioned dedicated endpoint when one is available.
+**Phase 1.8 — Adaptive Hedging & Cost-Aware Routing:** replace the fixed hedge delay with a policy derived from observed latency distributions and request risk, quantify redundant-token/cost overhead, test whether critical and non-critical scenarios should use different hedge thresholds, and add a dedicated-endpoint leg only after infrastructure is explicitly provisioned.
 
-After infrastructure resilience is production-qualified, Phase 2 moves into governed longitudinal memory and relationship-safety evaluation.
+After infrastructure resilience is production-qualified across cost and latency trade-offs, Phase 2 moves into governed longitudinal memory and relationship-safety evaluation.
 
 ## Scientific and safety boundaries
 
-HIA-Bench is a synthetic engineering benchmark. It does **not** diagnose medical or mental-health conditions, establish ground-truth user emotion, clinically validate a product, claim consciousness/AGI, or replace independent human review for high-risk deployments. Results are scoped to the tested benchmark, model, policy, provider routes, generation configuration, injected-fault model, and observation window.
+HIA-Bench is a synthetic engineering benchmark. It does **not** diagnose medical or mental-health conditions, establish ground-truth user emotion, clinically validate a product, claim consciousness/AGI, or replace independent human review for high-risk deployments. Results are scoped to the tested benchmark, model, policy, provider routes, generation configuration, injected-fault model, hedge strategy, and observation window.
 
 ## License
 

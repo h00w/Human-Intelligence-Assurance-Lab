@@ -75,6 +75,11 @@ def csv_bytes(rows: Iterable[Mapping[str, object]], fields: Iterable[str]) -> by
 
 
 def queue_fingerprint(rows: Iterable[Mapping[str, object]]) -> str:
+    """Fingerprint only immutable candidate evidence visible to human reviewers.
+
+    Judge output is deliberately excluded so the human batch can be frozen before
+    any semantic-judge call and the judge can be evaluated after independent review.
+    """
     canonical = []
     for row in rows:
         canonical.append(
@@ -85,8 +90,6 @@ def queue_fingerprint(rows: Iterable[Mapping[str, object]]) -> str:
                     "domain",
                     "risk_level",
                     "candidate_response",
-                    "judge_pass",
-                    "judge_overall",
                 )
             )
         )
@@ -102,7 +105,6 @@ def validate_frozen_queue(rows: list[dict[str, str]], *, minimum_samples: int = 
         "domain",
         "risk_level",
         "candidate_response",
-        "judge_pass",
     }
     missing = required - set(rows[0])
     if missing:
@@ -113,8 +115,9 @@ def validate_frozen_queue(rows: list[dict[str, str]], *, minimum_samples: int = 
     if len(ids) != len(set(ids)):
         raise ValueError("frozen queue contains duplicate scenario_id")
     for row in rows:
-        if parse_bool(row.get("judge_pass")) is None:
-            raise ValueError(f"invalid frozen judge_pass for {row['scenario_id']}")
+        if "judge_pass" in row and row.get("judge_pass", "").strip():
+            if parse_bool(row.get("judge_pass")) is None:
+                raise ValueError(f"invalid frozen judge_pass for {row['scenario_id']}")
         if not row.get("candidate_response", "").strip():
             raise ValueError(f"candidate response missing for {row['scenario_id']}")
 
@@ -214,6 +217,7 @@ def merge_independent_reviews(
                     "adjudication_notes": "",
                 }
             )
+        judge_pass = parse_bool(frozen.get("judge_pass", ""))
         for row in sample_rows:
             merged.append(
                 {
@@ -221,7 +225,7 @@ def merge_independent_reviews(
                     "scenario_id": sample_id,
                     "domain": frozen["domain"],
                     "risk_level": frozen["risk_level"],
-                    "judge_pass": bool_text(parse_bool(frozen["judge_pass"])),
+                    "judge_pass": bool_text(judge_pass),
                     "reviewer_id": row["reviewer_id"],
                     "human_pass": bool_text(parse_bool(row["human_pass"])),
                     "adjudicated_pass": "",

@@ -12,6 +12,9 @@
 - **GitHub repository:** https://github.com/h00w/Human-Intelligence-Assurance-Lab/
 - **Portfolio case study:** https://hendarmawan.se/projects/human-intelligence-assurance-lab/
 - **Live Hugging Face Space:** https://huggingface.co/spaces/h0000w/Human-Intelligence-Assurance-Lab
+- **Evaluation Dataset:** https://huggingface.co/datasets/h0000w/Human-Intelligence-Assurance-Lab
+- **Model / Evaluator Artifact:** https://huggingface.co/h0000w/Human-Intelligence-Assurance-Lab
+- **Operational Evidence Bucket:** https://huggingface.co/buckets/h0000w/Human-Intelligence-Assurance-Lab-storage
 
 <p align="center">
   <a href="https://github.com/h00w/Human-Intelligence-Assurance-Lab">

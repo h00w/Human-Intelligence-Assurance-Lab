@@ -7,6 +7,12 @@
 [![Hugging Face Dataset](https://img.shields.io/badge/Hugging%20Face-Dataset-yellow)](https://huggingface.co/datasets/h0000w/Human-Intelligence-Assurance-Lab)
 [![Hugging Face Space](https://img.shields.io/badge/Hugging%20Face-Space-yellow)](https://huggingface.co/spaces/h0000w/Human-Intelligence-Assurance-Lab)
 
+## Project links
+
+- **GitHub repository:** https://github.com/h00w/Human-Intelligence-Assurance-Lab/
+- **Portfolio case study:** https://hendarmawan.se/projects/human-intelligence-assurance-lab/
+- **Live Hugging Face Space:** https://huggingface.co/spaces/h0000w/Human-Intelligence-Assurance-Lab
+
 <p align="center">
   <a href="https://github.com/h00w/Human-Intelligence-Assurance-Lab">
     <img src="https://raw.githubusercontent.com/h00w/h00w.github.io/refs/heads/main/public/hia-lab.png" alt="Human Intelligence Assurance Lab" width="100%">
@@ -87,47 +93,47 @@ HIA-Lab does not silently create billable infrastructure. Once a dedicated endpo
 
 ## Phase history
 
-### Phase 1 — HIA-Bench v0.1
+### Phase 1: HIA-Bench v0.1
 - 100 synthetic scenarios across six human-centered AI risk domains.
 - Deterministic, auditable safety/privacy checks.
 - Lexicographic **SHIP / INVESTIGATE / HOLD** decisions.
 
-### Phase 1.1 — Real-model evidence
+### Phase 1.1: Real-model evidence
 - Hugging Face routed inference.
 - Raw response, latency, token, cost, provider, truncation, violation, and lineage evidence.
 - Empty responses and incomplete generations fail closed.
 
-### Phase 1.2 — Model, policy, and semantic assurance
+### Phase 1.2: Model, policy, and semantic assurance
 - Live model bakeoff and policy ablation.
 - Composite behavioral + operational production gate.
 - Semantic judge remains **shadow-only** pending independent human calibration.
 
-### Phase 1.3 — Single-run SLO closure
+### Phase 1.3: Single-run SLO closure
 - Risk-aware Llama configuration reached a favorable single-run production SHIP.
 - Later repeated evidence showed why one favorable run was insufficient.
 
-### Phase 1.4 — Repeated-run production confidence
+### Phase 1.4: Repeated-run production confidence
 - 5 trials / 60 generations.
 - Production SHIP recurrence 0%.
 - Median p95 20.14 s; worst p95 41.23 s.
 - One critical wellness response truncated.
 - Executive decision: **HOLD**.
 
-### Phase 1.5 — Provider resilience & critical-response control
+### Phase 1.5: Provider resilience & critical-response control
 - Nscale / Novita / DeepInfra bakeoff.
 - Bounded critical answers and hard request deadlines.
 - Nscale selected primary; Novita fallback.
 - 5 trials / 60 generations: 100% production SHIP, zero blockers/errors/truncations, worst p95 2.70 s.
 - Executive decision: **SHIP**.
 
-### Phase 1.6 — Fault Injection & Infrastructure Qualification
+### Phase 1.6: Fault Injection & Infrastructure Qualification
 - Forced primary timeout and truncation with real fallback.
 - Simultaneous provider degradation test.
 - 10-trial / 120-generation healthy-route qualification.
 - Sequential timeout recovery: behavioral SHIP but mean 5.252 s > 5.000 s SLO.
 - Executive decision: **HOLD**.
 
-### Phase 1.7 — Hedged Requests
+### Phase 1.7: Hedged Requests
 - Controlled 0.5 / 1.0 / 1.5 / 2.0 s hedge-threshold bakeoff.
 - 1.5 s selected in the measured run.
 - Forced 4-second timeout recovery: 2.762 s mean / 3.604 s p95, production **SHIP**.
@@ -136,7 +142,7 @@ HIA-Lab does not silently create billable infrastructure. Once a dedicated endpo
 - 10-trial / 120-generation repeated qualification: 100% production SHIP recurrence, worst p95 2.837 s.
 - Executive decision: **SHIP**.
 
-### Phase 1.8 — Adaptive Hedging & Cost-Aware Routing
+### Phase 1.8: Adaptive Hedging & Cost-Aware Routing
 - Hedge timing derived from the measured primary-route latency distribution and scenario risk.
 - Critical/high/medium/low hedge delays: 1.223 / 1.323 / 1.505 / 2.105 s in the authoritative run.
 - Adaptive healthy route: production **SHIP**.

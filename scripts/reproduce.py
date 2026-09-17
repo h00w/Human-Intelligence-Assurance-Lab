@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Generate a Production AI Evidence Contract v1 reproduction bundle."""
 
 from __future__ import annotations
@@ -30,7 +29,7 @@ def run_text(cmd):
             text=True,
             stderr=subprocess.DEVNULL,
         ).strip()
-    except Exception:
+    except (OSError, subprocess.SubprocessError):
         return None
 
 
@@ -74,7 +73,7 @@ def command_version(cmd):
             text=True,
             stderr=subprocess.DEVNULL,
         ).strip()
-    except Exception:
+    except (OSError, subprocess.SubprocessError):
         return None
 
 
@@ -88,8 +87,7 @@ def main():
     dirty = bool(run_text(["git", "status", "--porcelain"]))
 
     remote = (
-        run_text(["git", "config", "--get", "remote.origin.url"])
-        or cfg["repository"]
+        run_text(["git", "config", "--get", "remote.origin.url"]) or cfg["repository"]
     ).removesuffix(".git")
     if remote.startswith("git@github.com:"):
         remote = "https://github.com/" + remote.split(":", 1)[1]
@@ -102,6 +100,7 @@ def main():
         shell=True,
         text=True,
         capture_output=True,
+        check=False,
     )
     duration = round(time.monotonic() - started, 3)
 
@@ -111,12 +110,7 @@ def main():
     stderr.write_text(proc.stderr or "", encoding="utf-8")
 
     status = "PASS" if proc.returncode == 0 else "FAIL"
-    now = (
-        dt.datetime.now(dt.timezone.utc)
-        .replace(microsecond=0)
-        .isoformat()
-        .replace("+00:00", "Z")
-    )
+    now = dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
     evidence = {
         "contractVersion": "1.0.0",
@@ -183,18 +177,14 @@ def main():
         "artifacts": [digest(stdout), digest(stderr)],
         "extensions": {
             "schemaSha256": sha256(SCHEMA_PATH),
-            "note": (
-                "Reproduction PASS is not a production SHIP/approval decision."
-            ),
+            "note": ("Reproduction PASS is not a production SHIP/approval decision."),
         },
     }
 
     bundle = OUT / "evidence.json"
     bundle.write_text(json.dumps(evidence, indent=2) + "\n", encoding="utf-8")
 
-    checksums = "\n".join(
-        f"{sha256(path)}  {path.name}" for path in [bundle, stdout, stderr]
-    )
+    checksums = "\n".join(f"{sha256(path)}  {path.name}" for path in [bundle, stdout, stderr])
     (OUT / "checksums.sha256").write_text(checksums + "\n", encoding="utf-8")
 
     summary = (

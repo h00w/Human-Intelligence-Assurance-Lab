@@ -110,7 +110,7 @@ def main():
     stderr.write_text(proc.stderr or "", encoding="utf-8")
 
     status = "PASS" if proc.returncode == 0 else "FAIL"
-    now = dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    now = dt.datetime.now(dt.UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
     evidence = {
         "contractVersion": "1.0.0",

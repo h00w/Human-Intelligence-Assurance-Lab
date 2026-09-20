@@ -1,0 +1,30 @@
+{
+  "proofModelVersion": "1.0.0",
+  "minimumLevel": 3,
+  "maxLevel": 3,
+  "externalEvidence": [
+    {
+      "kind": "huggingface_space",
+      "url": "https://huggingface.co/api/spaces/h0000w/Human-Intelligence-Assurance-Lab",
+      "displayUrl": "https://huggingface.co/spaces/h0000w/Human-Intelligence-Assurance-Lab",
+      "required": true
+    },
+    {
+      "kind": "huggingface_dataset",
+      "url": "https://huggingface.co/api/datasets/h0000w/Human-Intelligence-Assurance-Lab",
+      "displayUrl": "https://huggingface.co/datasets/h0000w/Human-Intelligence-Assurance-Lab",
+      "required": true
+    },
+    {
+      "kind": "huggingface_methodology",
+      "url": "https://huggingface.co/api/models/h0000w/Human-Intelligence-Assurance-Lab",
+      "displayUrl": "https://huggingface.co/h0000w/Human-Intelligence-Assurance-Lab",
+      "required": true
+    }
+  ],
+  "level4": {},
+  "level5": {
+    "enabled": false,
+    "reason": "HIA-Lab contains provider and resilience studies, but the generic portfolio proof does not promote them to target-production validation; dedicated infrastructure is also explicitly not configured."
+  }
+}

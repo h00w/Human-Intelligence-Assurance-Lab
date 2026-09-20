@@ -4,13 +4,33 @@
   "repository": "https://github.com/h00w/Human-Intelligence-Assurance-Lab",
   "version": "1.8",
   "verification_command": "ruff check hia tests app.py scripts && pytest -q && python -m hia.runner",
-  "dependency_patterns": ["pyproject.toml", "requirements*.txt"],
-  "input_patterns": ["hia/**/*.py", "scripts/**/*.py", "app.py"],
+  "dependency_patterns": [
+    "pyproject.toml",
+    "requirements*.txt"
+  ],
+  "input_patterns": [
+    "hia/**/*.py",
+    "scripts/**/*.py",
+    "app.py"
+  ],
   "benchmark_name": "HIA-Bench",
   "benchmark_version": "0.1",
-  "benchmark_patterns": ["data/**/*", "benchmarks/**/*", "datasets/**/*", "tests/**/*.json", "tests/**/*.jsonl"],
+  "benchmark_patterns": [
+    "evals/scenarios/**/*.json",
+    "evals/scenarios/**/*.jsonl",
+    "data/**/*",
+    "benchmarks/**/*",
+    "datasets/**/*",
+    "tests/**/*.json",
+    "tests/**/*.jsonl"
+  ],
   "policy_name": "HIA release assurance policy",
   "policy_version": "1.8",
-  "policy_patterns": ["hia/**/*.py", "config/**/*", "docs/**/*policy*.md", "docs/**/*slo*.md"],
+  "policy_patterns": [
+    "hia/**/*.py",
+    "config/**/*",
+    "docs/**/*policy*.md",
+    "docs/**/*slo*.md"
+  ],
   "approvals_required": false
 }

@@ -1,3 +1,8 @@
+import re
+
+import tomllib
+
+from scripts import build_proof_bundle
 from scripts.build_proof_bundle import dependency_records
 
 
@@ -8,13 +13,14 @@ def test_dependency_records_include_pyproject_dependencies():
         for record in records
         if record["scope"] == "project.dependencies"
     }
+    pyproject = tomllib.loads(
+        (build_proof_bundle.ROOT / "pyproject.toml").read_text(encoding="utf-8")
+    )
+    expected_records = set()
+    for dep in pyproject["project"]["dependencies"]:
+        match = re.match(r"^([A-Za-z0-9_.-]+)\s*(.*)$", dep)
+        assert match is not None
+        name, version = match.groups()
+        expected_records.add((name, version.strip() or "unspecified", "project.dependencies"))
 
-    assert ("pydantic", ">=2.7,<3", "project.dependencies") in pyproject_records
-    assert ("PyYAML", ">=6.0,<7", "project.dependencies") in pyproject_records
-    assert ("pandas", ">=2.2,<3", "project.dependencies") in pyproject_records
-    assert ("streamlit", ">=1.37,<2", "project.dependencies") in pyproject_records
-    assert (
-        "huggingface_hub",
-        ">=1.0,<2",
-        "project.dependencies",
-    ) in pyproject_records
+    assert expected_records <= pyproject_records

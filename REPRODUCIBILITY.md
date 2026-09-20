@@ -54,3 +54,18 @@ pip install -e '.[dev]'
 make proof
 cat evidence/out/current/proof-summary.md
 ```
+
+
+## Portable proof artifact and signed provenance
+
+Step 3 packages the proof state with `make proof-package` and verifies internal integrity with `make proof-verify`.
+
+The archive contains the Evidence Contract, proof assessment, proof manifest, direct-dependency SPDX SBOM, provenance linkage, schemas, proof model and checksums. Trusted GitHub Actions runs additionally attach SLSA provenance, SBOM and custom proof-manifest attestations to the completed bundle.
+
+Verify the external signature with:
+
+```bash
+gh attestation verify --owner h00w evidence/out/current/production-ai-proof-bundle.tar.gz
+```
+
+See [PROVENANCE.md](PROVENANCE.md). A valid signature proves provenance and integrity; it does not raise the five-level proof state by itself.

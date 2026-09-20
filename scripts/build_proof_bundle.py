@@ -9,8 +9,9 @@ import os
 import pathlib
 import re
 import tarfile
-import tomllib
 from datetime import UTC, datetime
+
+import tomllib
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 OUT = ROOT / "evidence" / "out" / "current"
@@ -68,20 +69,17 @@ def dependency_records() -> list[dict]:
 
     pyproject = ROOT / "pyproject.toml"
     if pyproject.is_file():
-        try:
-            data = tomllib.loads(pyproject.read_text(encoding="utf-8"))
-            for dep in data.get("project", {}).get("dependencies", []) or []:
-                match = re.match(r"^([A-Za-z0-9_.-]+)\s*(.*)$", dep)
-                if match:
-                    name, version = match.groups()
-                    records[f"pypi:{name}:pyproject"] = {
-                        "name": name,
-                        "version": version.strip() or "unspecified",
-                        "ecosystem": "pypi",
-                        "scope": "project.dependencies",
-                    }
-        except Exception:
-            pass
+        data = tomllib.loads(pyproject.read_text(encoding="utf-8"))
+        for dep in data.get("project", {}).get("dependencies", []) or []:
+            match = re.match(r"^([A-Za-z0-9_.-]+)\s*(.*)$", dep)
+            if match:
+                name, version = match.groups()
+                records[f"pypi:{name}:pyproject"] = {
+                    "name": name,
+                    "version": version.strip() or "unspecified",
+                    "ecosystem": "pypi",
+                    "scope": "project.dependencies",
+                }
 
     return sorted(records.values(), key=lambda x: (x["ecosystem"], x["name"], x["scope"]))
 

@@ -123,8 +123,24 @@ def main() -> int:
     if checksum_errors:
         level2_reason += " Checksum errors: " + ", ".join(checksum_errors)
     levels.append(level_record(2, names[2], level2, level2_reason))
+    print(
+        json.dumps(
+            {
+                "level2Inputs": {
+                    "dirty": evidence.get("subject", {}).get("dirty"),
+                    "checksumOk": checksum_ok,
+                    "dependencyFiles": len(evidence.get("environment", {}).get("dependencyFiles", [])),
+                    "benchmarkFiles": len(evidence.get("benchmark", {}).get("files", [])),
+                    "policyFiles": len(evidence.get("policy", {}).get("files", [])),
+                    "checksumErrors": checksum_errors,
+                }
+            },
+            sort_keys=True,
+        )
+    )
 
     external_ok, external_results = external_evidence(config.get("externalEvidence", []), args.offline)
+    print(json.dumps({"externalEvidence": external_results}, sort_keys=True))
     level3 = level2 and external_ok and config.get("maxLevel", 2) >= 3
     levels.append(
         level_record(

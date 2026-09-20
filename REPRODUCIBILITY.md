@@ -1,6 +1,6 @@
 # Reproducibility
 
-This repository implements the **Production AI Evidence Contract v1**.
+This repository implements **Production AI Evidence Contract v1** and the **Production AI Five-Level Proof Model v1**.
 
 ## Prerequisites
 
@@ -20,22 +20,29 @@ pip install -e '.[dev]'
 make reproduce
 ```
 
-The command runs the same deterministic lint/test/benchmark chain used by CI, captures stdout/stderr, hashes relevant source, benchmark, policy and dependency files, records Git/runtime identity, and writes:
+The command runs the same deterministic lint/test/benchmark chain used by CI, captures stdout/stderr, hashes relevant source, benchmark, policy and dependency files, records Git/runtime identity, and writes the Evidence Contract bundle under `evidence/out/current/`.
 
-```text
-evidence/out/current/
-├── evidence.json
-├── verification.stdout.log
-├── verification.stderr.log
-├── checksums.sha256
-└── summary.md
+A reproduction `PASS` is **L2 — Reproducible**. It does not prove clinical validity, universal emotional ground truth, provider-wide SLOs, or a production release decision.
+
+## Assess the five-level proof
+
+```bash
+make proof
 ```
 
-## Interpretation
+The assessor verifies the public HIA-Lab Hugging Face Space, Dataset and methodology artifact in addition to the Level-2 evidence and writes `proof.json` plus `proof-summary.md`.
 
-A reproduction `PASS` confirms the repository's configured verification chain passed for the recorded commit/environment. It does **not** prove clinical validity, universal emotional ground truth, provider-wide SLOs, or a production release decision.
+The generic portfolio claim is deliberately capped at **L3 — Capability-Validated**. HIA-Lab contains deeper provider-resilience and repeated-run studies, but those domain-specific `SHIP / INVESTIGATE / HOLD` results are not silently promoted into a universal Level-4/5 production claim. Dedicated inference infrastructure is also explicitly outside the current generic proof ceiling.
 
-HIA-Lab's domain-specific `SHIP / INVESTIGATE / HOLD` decisions remain separate and must be supported by the corresponding behavioral, repeated-run, operational and fault-injection evidence.
+For a network-independent run:
+
+```bash
+make proof-offline
+```
+
+Offline assessment can establish at most L2.
+
+See [PROOF_MODEL.md](PROOF_MODEL.md) for all five cumulative levels.
 
 ## Clean-room check
 
@@ -44,6 +51,6 @@ git clone https://github.com/h00w/Human-Intelligence-Assurance-Lab.git
 cd Human-Intelligence-Assurance-Lab
 git checkout <commit>
 pip install -e '.[dev]'
-make reproduce
-cat evidence/out/current/summary.md
+make proof
+cat evidence/out/current/proof-summary.md
 ```

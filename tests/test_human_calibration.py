@@ -49,3 +49,34 @@ def test_disagreement_requires_adjudication():
     result = evaluate_human_calibration(rows)
     assert result.ready_for_release is False
     assert result.unresolved_count >= 1
+
+
+def test_duplicate_reviewer_cannot_be_counted_twice():
+    rows = _rows()
+    rows.append(rows[0])
+    result = evaluate_human_calibration(rows)
+    assert result.ready_for_release is False
+    assert result.unresolved_count == 1
+
+
+def test_conflicting_adjudications_cannot_unlock_release():
+    rows = _rows()
+    rows[1] = HumanLabel(
+        sample_id=rows[1].sample_id,
+        reviewer_id=rows[1].reviewer_id,
+        human_pass=not rows[1].human_pass,
+        judge_pass=rows[1].judge_pass,
+        critical=rows[1].critical,
+        adjudicated_pass=False,
+    )
+    rows[0] = HumanLabel(
+        sample_id=rows[0].sample_id,
+        reviewer_id=rows[0].reviewer_id,
+        human_pass=rows[0].human_pass,
+        judge_pass=rows[0].judge_pass,
+        critical=rows[0].critical,
+        adjudicated_pass=True,
+    )
+    result = evaluate_human_calibration(rows)
+    assert result.ready_for_release is False
+    assert result.unresolved_count == 1

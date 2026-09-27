@@ -52,7 +52,7 @@ def evaluate_human_calibration(
     for sample_id in sorted(grouped):
         sample_rows = grouped[sample_id]
         unique_reviewers = {row.reviewer_id for row in sample_rows}
-        if len(unique_reviewers) < minimum_reviewers_per_sample:
+        if len(unique_reviewers) != len(sample_rows) or len(unique_reviewers) < minimum_reviewers_per_sample:
             unresolved += 1
             continue
         ordered = sorted(sample_rows, key=lambda row: row.reviewer_id)
@@ -65,6 +65,9 @@ def evaluate_human_calibration(
         elif len(adjudicated) == 1:
             human_pass = next(iter(adjudicated))
         else:
+            unresolved += 1
+            continue
+        if len(adjudicated) > 1 or (adjudicated and human_pass not in adjudicated):
             unresolved += 1
             continue
         judge_values = {row.judge_pass for row in sample_rows}

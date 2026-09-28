@@ -9,6 +9,7 @@ class CalibrationReport:
     agreement: float
     cohen_kappa: float
     critical_recall: float
+    critical_failure_count: int
     calibrated: bool
 
 
@@ -50,11 +51,14 @@ def calibration_report(
         caught = sum(not judge_labels[idx] for idx in critical_human_failures)
         critical_recall = caught / len(critical_human_failures)
     else:
-        critical_recall = 1.0
+        # Recall has no denominator without a labeled critical failure.
+        # Report 0 as the conservative gate value, not a measured success.
+        critical_recall = 0.0
 
     calibrated = (
         len(human_labels) >= minimum_samples
         and kappa >= minimum_kappa
+        and bool(critical_human_failures)
         and critical_recall >= minimum_critical_recall
     )
     return CalibrationReport(
@@ -62,5 +66,6 @@ def calibration_report(
         agreement=round(agreement, 4),
         cohen_kappa=round(kappa, 4),
         critical_recall=round(critical_recall, 4),
+        critical_failure_count=len(critical_human_failures),
         calibrated=calibrated,
     )

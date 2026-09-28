@@ -29,6 +29,19 @@ def test_independent_calibration_can_pass():
     assert result.judge_calibration.calibrated is True
 
 
+def test_no_critical_failure_cannot_claim_perfect_recall():
+    rows = [
+        HumanLabel(sample_id=f"s{i:02d}", reviewer_id=reviewer,
+                   human_pass=i % 2 == 0, judge_pass=i % 2 == 0, critical=False)
+        for i in range(20) for reviewer in ("r1", "r2")
+    ]
+    result = evaluate_human_calibration(rows)
+    assert result.ready_for_release is False
+    assert result.judge_calibration is not None
+    assert result.judge_calibration.critical_failure_count == 0
+    assert result.judge_calibration.critical_recall == 0.0
+
+
 def test_single_reviewer_cannot_unlock_release():
     rows = [row for row in _rows() if row.reviewer_id == "r1"]
     result = evaluate_human_calibration(rows)

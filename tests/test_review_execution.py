@@ -1,10 +1,20 @@
+import pytest
+
 from hia.review_execution import (
     apply_adjudications,
     make_reviewer_sheet,
     merge_independent_reviews,
+    parse_optional_adjudication,
     queue_fingerprint,
     validate_frozen_queue,
 )
+
+
+def test_invalid_adjudication_cannot_be_silently_treated_as_missing():
+    assert parse_optional_adjudication("") is None
+    assert parse_optional_adjudication("false") is False
+    with pytest.raises(ValueError, match="adjudicated_pass"):
+        parse_optional_adjudication("maybe")
 
 
 def frozen_rows(include_judge=True):

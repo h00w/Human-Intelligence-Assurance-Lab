@@ -1,13 +1,13 @@
+import pytest
+
 from hia.review_execution import (
     apply_adjudications,
     make_reviewer_sheet,
     merge_independent_reviews,
+    parse_optional_adjudication,
     queue_fingerprint,
     validate_frozen_queue,
-    parse_optional_adjudication,
 )
-
-import pytest
 
 
 def test_invalid_adjudication_cannot_be_silently_treated_as_missing():

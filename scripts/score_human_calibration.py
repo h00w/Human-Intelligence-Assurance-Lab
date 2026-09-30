@@ -32,7 +32,7 @@ def main() -> None:
             raise ValueError("sample provenance missing")
         if not reviewer:
             raise ValueError(f"reviewer provenance missing for sample {sample_id}")
-        key = (sample_id, reviewer)
+        key = (sample_id, reviewer.casefold())
         if key in seen:
             raise ValueError(f"duplicate reviewer label for sample {sample_id}: {reviewer}")
         seen.add(key)

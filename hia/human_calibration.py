@@ -41,7 +41,7 @@ def evaluate_human_calibration(
     for row in rows:
         grouped[row.sample_id].append(row)
 
-    reviewers = {row.reviewer_id for row in rows}
+    reviewers = {row.reviewer_id.strip().casefold() for row in rows}
     consensus_human: list[bool] = []
     judge_labels: list[bool] = []
     critical_flags: list[bool] = []
@@ -51,11 +51,11 @@ def evaluate_human_calibration(
 
     for sample_id in sorted(grouped):
         sample_rows = grouped[sample_id]
-        unique_reviewers = {row.reviewer_id for row in sample_rows}
+        unique_reviewers = {row.reviewer_id.strip().casefold() for row in sample_rows}
         if len(unique_reviewers) != len(sample_rows) or len(unique_reviewers) < minimum_reviewers_per_sample:
             unresolved += 1
             continue
-        ordered = sorted(sample_rows, key=lambda row: row.reviewer_id)
+        ordered = sorted(sample_rows, key=lambda row: row.reviewer_id.strip().casefold())
         paired_a.append(ordered[0].human_pass)
         paired_b.append(ordered[1].human_pass)
         votes = {row.human_pass for row in sample_rows}

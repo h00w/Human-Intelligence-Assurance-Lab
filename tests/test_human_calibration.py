@@ -86,6 +86,15 @@ def test_reviewer_case_variants_do_not_count_as_independent():
     assert result.unresolved_count == 1
 
 
+def test_blank_reviewer_cannot_count_as_independent():
+    rows = _rows()
+    rows[1] = HumanLabel(sample_id=rows[1].sample_id, reviewer_id=" ", human_pass=rows[1].human_pass,
+                         judge_pass=rows[1].judge_pass, critical=rows[1].critical)
+    result = evaluate_human_calibration(rows)
+    assert result.ready_for_release is False
+    assert result.unresolved_count == 1
+
+
 def test_conflicting_adjudications_cannot_unlock_release():
     rows = _rows()
     rows[1] = HumanLabel(

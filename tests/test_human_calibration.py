@@ -72,6 +72,20 @@ def test_duplicate_reviewer_cannot_be_counted_twice():
     assert result.unresolved_count == 1
 
 
+def test_reviewer_case_variants_do_not_count_as_independent():
+    rows = _rows()
+    rows[1] = HumanLabel(
+        sample_id=rows[0].sample_id,
+        reviewer_id="R1",
+        human_pass=rows[0].human_pass,
+        judge_pass=rows[0].judge_pass,
+        critical=rows[0].critical,
+    )
+    result = evaluate_human_calibration(rows)
+    assert result.ready_for_release is False
+    assert result.unresolved_count == 1
+
+
 def test_conflicting_adjudications_cannot_unlock_release():
     rows = _rows()
     rows[1] = HumanLabel(

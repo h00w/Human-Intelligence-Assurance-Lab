@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections import defaultdict
 from collections.abc import Iterable
 from dataclasses import dataclass
+from math import isfinite
 
 from .calibration import CalibrationReport, calibration_report, cohen_kappa
 
@@ -36,6 +37,18 @@ def evaluate_human_calibration(
     minimum_kappa: float = 0.70,
     minimum_critical_recall: float = 0.95,
 ) -> HumanCalibrationResult:
+    for name, value, minimum in (
+        ("minimum_samples", minimum_samples, 1),
+        ("minimum_reviewers_per_sample", minimum_reviewers_per_sample, 2),
+    ):
+        if isinstance(value, bool) or not isinstance(value, int) or value < minimum:
+            raise ValueError(f"{name} must be an integer >= {minimum}")
+    for name, value in (
+        ("minimum_kappa", minimum_kappa),
+        ("minimum_critical_recall", minimum_critical_recall),
+    ):
+        if isinstance(value, bool) or not isinstance(value, (int, float)) or not isfinite(value) or not 0 <= value <= 1:
+            raise ValueError(f"{name} must be finite and within [0, 1]")
     rows = list(labels)
     grouped: dict[str, list[HumanLabel]] = defaultdict(list)
     for row in rows:

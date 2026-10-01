@@ -1,4 +1,18 @@
+import pytest
+
 from hia.human_calibration import HumanLabel, evaluate_human_calibration
+
+
+@pytest.mark.parametrize("overrides", [
+    {"minimum_samples": 0}, {"minimum_samples": True}, {"minimum_samples": 1.5},
+    {"minimum_reviewers_per_sample": 1}, {"minimum_reviewers_per_sample": False},
+    {"minimum_kappa": float("nan")}, {"minimum_kappa": "0.7"}, {"minimum_kappa": -1},
+    {"minimum_critical_recall": float("inf")}, {"minimum_critical_recall": True},
+    {"minimum_critical_recall": 1.1},
+])
+def test_invalid_calibration_policy_is_rejected(overrides):
+    with pytest.raises(ValueError):
+        evaluate_human_calibration(_rows(), **overrides)
 
 
 def _rows(count: int = 20):

@@ -130,3 +130,14 @@ def test_conflicting_adjudications_cannot_unlock_release():
     result = evaluate_human_calibration(rows)
     assert result.ready_for_release is False
     assert result.unresolved_count == 1
+
+
+@pytest.mark.parametrize("field", ["human_pass", "judge_pass", "critical", "adjudicated_pass"])
+@pytest.mark.parametrize("invalid", [0, 1, "false", "true", [], {}])
+def test_direct_calibration_cannot_accept_coerced_review_labels(field, invalid):
+    from dataclasses import replace
+
+    rows = _rows()
+    rows[0] = replace(rows[0], **{field: invalid})
+    with pytest.raises(ValueError, match="boolean"):
+        evaluate_human_calibration(rows)

@@ -52,6 +52,11 @@ def evaluate_human_calibration(
     rows = list(labels)
     grouped: dict[str, list[HumanLabel]] = defaultdict(list)
     for row in rows:
+        if any(not isinstance(getattr(row, field), bool) for field in
+               ("human_pass", "judge_pass", "critical")):
+            raise ValueError("human, judge and critical labels must be booleans")
+        if row.adjudicated_pass is not None and not isinstance(row.adjudicated_pass, bool):
+            raise ValueError("adjudicated_pass must be a boolean or None")
         grouped[row.sample_id].append(row)
 
     reviewers = {row.reviewer_id.strip().casefold() for row in rows if row.reviewer_id.strip()}

@@ -43,6 +43,28 @@ def test_independent_calibration_can_pass():
     assert result.judge_calibration.calibrated is True
 
 
+def test_sample_id_whitespace_cannot_inflate_independent_evidence():
+    from dataclasses import replace
+
+    rows = _rows(count=10)
+    rows += [replace(row, sample_id=f" {row.sample_id} ") for row in rows]
+    result = evaluate_human_calibration(rows)
+    assert result.ready_for_release is False
+    assert result.unresolved_count == 10
+    assert result.sample_count == 0
+
+
+@pytest.mark.parametrize("field", ["sample_id", "reviewer_id"])
+@pytest.mark.parametrize("invalid", [None, 1, [], {}])
+def test_identity_types_are_rejected(field, invalid):
+    from dataclasses import replace
+
+    rows = _rows()
+    rows[0] = replace(rows[0], **{field: invalid})
+    with pytest.raises(TypeError, match="identities"):
+        evaluate_human_calibration(rows)
+
+
 def test_no_critical_failure_cannot_claim_perfect_recall():
     rows = [
         HumanLabel(sample_id=f"s{i:02d}", reviewer_id=reviewer,

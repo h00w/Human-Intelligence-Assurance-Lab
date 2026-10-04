@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from math import isfinite
 
 
 @dataclass(frozen=True, slots=True)
@@ -21,6 +22,28 @@ class PairwiseComparison:
 
 
 def compare_candidates(a: CandidateSummary, b: CandidateSummary) -> PairwiseComparison:
+    for summary in (a, b):
+        if (
+            not isinstance(summary.name, str) or not summary.name.strip()
+            or summary.decision not in ("SHIP", "INVESTIGATE", "HOLD")
+            or isinstance(summary.blocker_failures, bool)
+            or not isinstance(summary.blocker_failures, int)
+            or summary.blocker_failures < 0
+        ):
+            raise ValueError("candidate summary requires valid identity, decision and blocker count")
+        for name, value, bounded in (
+            ("pass_rate", summary.pass_rate, True),
+            ("semantic_score", summary.semantic_score, True),
+            ("mean_latency_ms", summary.mean_latency_ms, False),
+            ("estimated_cost_usd", summary.estimated_cost_usd, False),
+        ):
+            if value is None and name != "pass_rate":
+                continue
+            if (
+                isinstance(value, bool) or not isinstance(value, (int, float))
+                or not isfinite(value) or value < 0 or (bounded and value > 1)
+            ):
+                raise ValueError(f"candidate summary has invalid {name}")
     reasons: list[str] = []
 
     if a.blocker_failures != b.blocker_failures:

@@ -1,0 +1,27 @@
+{
+  "project": {
+    "name": "Human Intelligence Assurance Lab",
+    "repository_name": "h00w/Human-Intelligence-Assurance-Lab",
+    "repository_url": "https://github.com/h00w/Human-Intelligence-Assurance-Lab",
+    "subject_type": "human-centered-ai-system",
+    "version": "0.2.0"
+  },
+  "inputs": [
+    {"path": "evals", "kind": "assurance-benchmark-and-evaluators"},
+    {"path": "hia", "kind": "assurance-engine"},
+    {"path": "configs", "kind": "policy-and-runtime-configuration"},
+    {"path": "human_review", "kind": "human-calibration-workflow"},
+    {"path": "pyproject.toml", "kind": "dependency-manifest"}
+  ],
+  "steps": [
+    {"name": "unit-and-assurance-tests", "command": ["{python}", "-m", "pytest", "-q"], "cwd": "."},
+    {"name": "python-package-compile-check", "command": ["{python}", "-m", "compileall", "-q", "hia", "evals"], "cwd": "."}
+  ],
+  "domain_decision": null,
+  "domain_decision_source": "HIA executive assurance policy",
+  "notes": [
+    "The default reproduction path is intentionally offline and does not require HF_TOKEN.",
+    "Live provider, repeated qualification, adaptive hedging and fault-injection runs remain separate retained operational evidence.",
+    "HIA-Bench is synthetic and non-clinical; reproduction does not establish medical or emotional ground truth."
+  ]
+}

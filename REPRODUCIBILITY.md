@@ -1,88 +1,71 @@
 # Reproducibility
 
-Human Intelligence Assurance Lab implements **Production AI Evidence Contract v1** to make assurance results traceable to an exact repository revision, benchmark/evaluator inputs, policy/configuration, environment and verification logs.
+This repository implements **Production AI Evidence Contract v1** and the **Production AI Five-Level Proof Model v1**.
 
-## One-command reproduction
+## Prerequisites
+
+- Git
+- Python 3.11+
+
+Install the development environment:
+
+```bash
+python -m pip install --upgrade pip
+pip install -e '.[dev]'
+```
+
+## Reproduce
+
+```bash
+make reproduce
+```
+
+The command runs the same deterministic lint/test/benchmark chain used by CI, captures stdout/stderr, hashes relevant source, benchmark, policy and dependency files, records Git/runtime identity, and writes the Evidence Contract bundle under `evidence/out/current/`.
+
+A reproduction `PASS` is **L2 — Reproducible**. It does not prove clinical validity, universal emotional ground truth, provider-wide SLOs, or a production release decision.
+
+## Assess the five-level proof
+
+```bash
+make proof
+```
+
+The assessor verifies the public HIA-Lab Hugging Face Space, Dataset and methodology artifact in addition to the Level-2 evidence and writes `proof.json` plus `proof-summary.md`.
+
+The generic portfolio claim is deliberately capped at **L3 — Capability-Validated**. HIA-Lab contains deeper provider-resilience and repeated-run studies, but those domain-specific `SHIP / INVESTIGATE / HOLD` results are not silently promoted into a universal Level-4/5 production claim. Dedicated inference infrastructure is also explicitly outside the current generic proof ceiling.
+
+For a network-independent run:
+
+```bash
+make proof-offline
+```
+
+Offline assessment can establish at most L2.
+
+See [PROOF_MODEL.md](PROOF_MODEL.md) for all five cumulative levels.
+
+## Clean-room check
 
 ```bash
 git clone https://github.com/h00w/Human-Intelligence-Assurance-Lab.git
 cd Human-Intelligence-Assurance-Lab
-python -m venv .venv
-source .venv/bin/activate
-python -m pip install --upgrade pip
+git checkout <commit>
 pip install -e '.[dev]'
-make reproduce
+make proof
+cat evidence/out/current/proof-summary.md
 ```
 
-The default path is intentionally offline and does not require `HF_TOKEN`.
 
-## What is reproduced
+## Portable proof artifact and signed provenance
 
-`evidence/reproduction-plan.json` currently verifies:
+Step 3 packages the proof state with `make proof-package` and verifies internal integrity with `make proof-verify`.
 
-1. the unit/assurance test suite;
-2. import/compile integrity for the assurance engine and evaluator package;
-3. exact SHA-256 identities for the benchmark/evaluator tree, HIA engine, configuration, human-review workflow and dependency manifest;
-4. a Production AI Evidence Contract v1 bundle.
+The archive contains the Evidence Contract, proof assessment, proof manifest, direct-dependency SPDX SBOM, provenance linkage, schemas, proof model and checksums. Trusted GitHub Actions runs additionally attach SLSA provenance, SBOM and custom proof-manifest attestations to the completed bundle.
 
-The purpose is to reproduce the declared local assurance machinery. Live-provider experiments, repeated qualification, adaptive-hedging measurements and fault-injection runs remain separate retained operational evidence because they depend on external providers and dated runtime conditions.
-
-## Evidence output
-
-```text
-artifacts/reproduction/<UTC timestamp>-<git sha>/
-├── evidence.json
-├── summary.md
-├── checksums.sha256
-└── logs/
-```
-
-Statuses are:
-
-- `REPRODUCED` — all declared deterministic checks passed from a clean tracked checkout;
-- `PARTIAL` — checks passed but tracked local modifications were present;
-- `FAILED` — a required input or verification step failed.
-
-These statuses do not replace the HIA **SHIP / INVESTIGATE / HOLD** assurance policy. A successfully reproduced `HOLD` remains a valid reproduction result.
-
-## Important scope boundary
-
-HIA-Bench is synthetic and non-clinical. Reproducing the benchmark and assurance code does not establish emotional or medical ground truth, nor does it prove that the benchmark generalizes to all users or cultures.
-
-The contract proves that the declared evidence can be reconstructed for the identified source revision.
-
-## Verify checksums
+Verify the external signature with:
 
 ```bash
-cd artifacts/reproduction/$(cat artifacts/reproduction/LATEST)
-sha256sum --check checksums.sha256
+gh attestation verify --owner h00w evidence/out/current/production-ai-proof-bundle.tar.gz
 ```
 
-## Custom output location
-
-```bash
-REPRO_OUT=/tmp/hia-evidence make reproduce
-```
-
-## Clean-room evidence standard
-
-For evidence intended for publication or citation:
-
-1. checkout an immutable tag or full commit SHA;
-2. start from a clean tracked working tree;
-3. install dependencies from that revision;
-4. execute `make reproduce`;
-5. preserve the complete evidence directory;
-6. attach live-provider evidence separately with provider/model revision, policy, benchmark version, run count, fault model and observation window.
-
-## Contract source
-
-The canonical schema is maintained in `h00w/model-quality-release-gate` and vendored locally at:
-
-`evidence/production-ai-evidence-contract-v1.schema.json`
-
-The schema hash is recorded in every generated bundle.
-
-## Updating the plan
-
-Update the reproduction plan whenever the benchmark, deterministic gates, release policy, human-calibration workflow or critical runtime configuration changes. Do not delete a failing check to manufacture a green result. The failure itself is part of the assurance evidence.
+See [PROVENANCE.md](PROVENANCE.md). A valid signature proves provenance and integrity; it does not raise the five-level proof state by itself.

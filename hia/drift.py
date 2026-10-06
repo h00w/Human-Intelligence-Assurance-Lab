@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
+from math import isfinite
 from statistics import mean
 
 
@@ -39,6 +40,15 @@ def assess_long_window(
 ) -> LongWindowReport:
     if not snapshots:
         return LongWindowReport(0, 0.0, 0.0, 0.0, 0.0, False, "WAITING", ("no time-separated snapshots",))
+    for row in snapshots:
+        for field in ("mean_latency_ms", "p95_latency_ms"):
+            value = getattr(row, field)
+            if isinstance(value, bool) or not isinstance(value, (int, float)) or not isfinite(value) or value < 0:
+                raise ValueError(f"qualification snapshot has invalid {field}")
+        for field in ("blocker_failures", "provider_errors", "truncations"):
+            value = getattr(row, field)
+            if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+                raise ValueError(f"qualification snapshot has invalid {field}")
     ordered = sorted(snapshots, key=lambda row: row.timestamp)
     span_days = (ordered[-1].timestamp - ordered[0].timestamp).total_seconds() / 86400
     ship_rate = sum(row.production_decision == "SHIP" for row in ordered) / len(ordered)

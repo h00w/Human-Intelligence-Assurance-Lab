@@ -14,6 +14,7 @@ Engineering contract:
 - inter-reviewer kappa >=0.70;
 - judge-vs-human kappa >=0.70;
 - critical-failure recall >=0.95.
+- at least one independently labeled critical human failure, so recall has a denominator.
 
 No automated process may fabricate these labels.
 

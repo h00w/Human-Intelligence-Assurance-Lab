@@ -73,3 +73,14 @@ This Space intentionally uses **Docker + CPU Basic**. The UI and deterministic e
 HIA-Lab uses synthetic scenarios and engineering assurance checks. It does not diagnose users, establish ground-truth emotions, claim universal model safety, or provide clinical validation. Semantic judging remains shadow-only until independently calibrated against human labels.
 
 Source of truth: `h00w/Human-Intelligence-Assurance-Lab` on GitHub.
+
+
+## Five-level production-AI proof
+
+HIA-Lab now reports portfolio proof using:
+
+`L1 Runnable → L2 Reproducible → L3 Capability-Validated → L4 Production-Candidate → L5 Production-Validated`.
+
+The canonical GitHub source computes the level with `make proof`. The public benchmark, methodology artifact and Docker Space support **L3 — Capability-Validated**. Domain-specific provider and resilience experiments remain visible, but they are not generalized into a Level-4/5 production claim without the corresponding deployment-scoped evidence.
+
+Specification: https://github.com/h00w/Human-Intelligence-Assurance-Lab/blob/main/PROOF_MODEL.md

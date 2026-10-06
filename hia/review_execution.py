@@ -59,6 +59,15 @@ def parse_bool(value: object) -> bool | None:
     return None
 
 
+def parse_optional_adjudication(value: object) -> bool | None:
+    if value is None or not str(value).strip():
+        return None
+    parsed = parse_bool(value)
+    if parsed is None:
+        raise ValueError("adjudicated_pass must be true, false, or blank")
+    return parsed
+
+
 def bool_text(value: bool | None) -> str:
     if value is None:
         return ""

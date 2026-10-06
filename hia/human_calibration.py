@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections import defaultdict
 from collections.abc import Iterable
 from dataclasses import dataclass
+from math import isfinite
 
 from .calibration import CalibrationReport, calibration_report, cohen_kappa
 
@@ -36,12 +37,31 @@ def evaluate_human_calibration(
     minimum_kappa: float = 0.70,
     minimum_critical_recall: float = 0.95,
 ) -> HumanCalibrationResult:
+    for name, value, minimum in (
+        ("minimum_samples", minimum_samples, 1),
+        ("minimum_reviewers_per_sample", minimum_reviewers_per_sample, 2),
+    ):
+        if isinstance(value, bool) or not isinstance(value, int) or value < minimum:
+            raise ValueError(f"{name} must be an integer >= {minimum}")
+    for name, value in (
+        ("minimum_kappa", minimum_kappa),
+        ("minimum_critical_recall", minimum_critical_recall),
+    ):
+        if isinstance(value, bool) or not isinstance(value, (int, float)) or not isfinite(value) or not 0 <= value <= 1:
+            raise ValueError(f"{name} must be finite and within [0, 1]")
     rows = list(labels)
     grouped: dict[str, list[HumanLabel]] = defaultdict(list)
     for row in rows:
-        grouped[row.sample_id].append(row)
+        if not isinstance(row.sample_id, str) or not isinstance(row.reviewer_id, str):
+            raise TypeError("sample and reviewer identities must be strings")
+        if any(not isinstance(getattr(row, field), bool) for field in
+               ("human_pass", "judge_pass", "critical")):
+            raise ValueError("human, judge and critical labels must be booleans")
+        if row.adjudicated_pass is not None and not isinstance(row.adjudicated_pass, bool):
+            raise ValueError("adjudicated_pass must be a boolean or None")
+        grouped[row.sample_id.strip()].append(row)
 
-    reviewers = {row.reviewer_id for row in rows}
+    reviewers = {row.reviewer_id.strip().casefold() for row in rows if row.reviewer_id.strip()}
     consensus_human: list[bool] = []
     judge_labels: list[bool] = []
     critical_flags: list[bool] = []
@@ -51,11 +71,12 @@ def evaluate_human_calibration(
 
     for sample_id in sorted(grouped):
         sample_rows = grouped[sample_id]
-        unique_reviewers = {row.reviewer_id for row in sample_rows}
-        if len(unique_reviewers) < minimum_reviewers_per_sample:
+        unique_reviewers = {row.reviewer_id.strip().casefold() for row in sample_rows}
+        if (not sample_id.strip() or "" in unique_reviewers or len(unique_reviewers) != len(sample_rows)
+                or len(unique_reviewers) < minimum_reviewers_per_sample):
             unresolved += 1
             continue
-        ordered = sorted(sample_rows, key=lambda row: row.reviewer_id)
+        ordered = sorted(sample_rows, key=lambda row: row.reviewer_id.strip().casefold())
         paired_a.append(ordered[0].human_pass)
         paired_b.append(ordered[1].human_pass)
         votes = {row.human_pass for row in sample_rows}
@@ -65,6 +86,9 @@ def evaluate_human_calibration(
         elif len(adjudicated) == 1:
             human_pass = next(iter(adjudicated))
         else:
+            unresolved += 1
+            continue
+        if len(adjudicated) > 1 or (adjudicated and human_pass not in adjudicated):
             unresolved += 1
             continue
         judge_values = {row.judge_pass for row in sample_rows}

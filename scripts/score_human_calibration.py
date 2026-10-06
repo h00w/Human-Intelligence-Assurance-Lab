@@ -9,7 +9,7 @@ from pathlib import Path
 from huggingface_hub import HfApi, batch_bucket_files
 
 from hia.human_calibration import HumanLabel, evaluate_human_calibration
-from hia.review_execution import parse_bool
+from hia.review_execution import parse_bool, parse_optional_adjudication
 
 ROOT = Path(__file__).resolve().parents[1]
 INPUT = Path(os.getenv("HIA_HUMAN_REVIEW_CSV", ROOT / "artifacts" / "human_review_queue.csv"))
@@ -32,7 +32,7 @@ def main() -> None:
             raise ValueError("sample provenance missing")
         if not reviewer:
             raise ValueError(f"reviewer provenance missing for sample {sample_id}")
-        key = (sample_id, reviewer)
+        key = (sample_id, reviewer.casefold())
         if key in seen:
             raise ValueError(f"duplicate reviewer label for sample {sample_id}: {reviewer}")
         seen.add(key)
@@ -43,7 +43,7 @@ def main() -> None:
             raise ValueError(f"human_pass missing or invalid for sample {sample_id}")
         if judge is None:
             raise ValueError(f"judge_pass missing or invalid for sample {sample_id}")
-        adjudicated = parse_bool(row.get("adjudicated_pass", ""))
+        adjudicated = parse_optional_adjudication(row.get("adjudicated_pass", ""))
         labels.append(
             HumanLabel(
                 sample_id=sample_id,

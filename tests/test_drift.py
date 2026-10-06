@@ -1,6 +1,20 @@
+from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 
+import pytest
+
 from hia.drift import QualificationSnapshot, assess_long_window
+
+
+@pytest.mark.parametrize("field,value", [
+    ("mean_latency_ms", float("nan")), ("p95_latency_ms", float("inf")),
+    ("mean_latency_ms", -1), ("p95_latency_ms", True),
+    ("provider_errors", -1), ("blocker_failures", False), ("truncations", 0.5),
+])
+def test_invalid_long_window_evidence_cannot_ship(field, value):
+    snapshots = [_snapshot(0), _snapshot(4), replace(_snapshot(8), **{field: value})]
+    with pytest.raises(ValueError, match="snapshot"):
+        assess_long_window(snapshots)
 
 
 def _snapshot(day: int, decision: str = "SHIP"):

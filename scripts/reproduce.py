@@ -3,285 +3,208 @@
 from __future__ import annotations
 
 import datetime as dt
+import glob
 import hashlib
 import json
 import os
+import pathlib
 import platform
+import shutil
 import subprocess
 import sys
 import time
-from pathlib import Path
-from typing import Any
+import uuid
 
-ROOT = Path(__file__).resolve().parents[1]
-PLAN_PATH = ROOT / "evidence" / "reproduction-plan.json"
+ROOT = pathlib.Path(__file__).resolve().parents[1]
+CFG_PATH = ROOT / "evidence" / "reproduce-config.json"
 SCHEMA_PATH = ROOT / "evidence" / "production-ai-evidence-contract-v1.schema.json"
-CONTRACT_SOURCE = (
-    "https://raw.githubusercontent.com/h00w/model-quality-release-gate/main/"
-    "evidence/production-ai-evidence-contract-v1.schema.json"
-)
-IGNORED_PARTS = {
-    ".git",
-    ".venv",
-    "node_modules",
-    "__pycache__",
-    ".pytest_cache",
-    "artifacts",
-}
+OUT = ROOT / "evidence" / "out" / "current"
 
 
-def utc_now() -> str:
-    return dt.datetime.now(dt.timezone.utc).isoformat().replace("+00:00", "Z")
-
-
-def sha256_file(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
-
-
-def sha256_path(path: Path) -> str:
-    if path.is_file():
-        return sha256_file(path)
-    digest = hashlib.sha256()
-    for child in sorted(item for item in path.rglob("*") if item.is_file()):
-        if any(part in IGNORED_PARTS for part in child.relative_to(path).parts):
-            continue
-        digest.update(child.relative_to(ROOT).as_posix().encode("utf-8"))
-        digest.update(b"\0")
-        digest.update(sha256_file(child).encode("ascii"))
-        digest.update(b"\n")
-    return digest.hexdigest()
-
-
-def run_capture(argv: list[str], cwd: Path | None = None) -> tuple[int, str]:
+def run_text(cmd):
     try:
-        process = subprocess.run(
-            argv,
-            cwd=str(cwd or ROOT),
+        return subprocess.check_output(
+            cmd,
+            cwd=ROOT,
             text=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            check=False,
-        )
-        return process.returncode, process.stdout
-    except FileNotFoundError as exc:
-        return 127, f"command not found: {exc}\n"
-
-
-def git_value(*args: str) -> str | None:
-    code, output = run_capture(["git", *args])
-    return output.strip() if code == 0 else None
-
-
-def tool_version(command: list[str]) -> str | None:
-    code, output = run_capture(command)
-    if code != 0 or not output.strip():
+            stderr=subprocess.DEVNULL,
+        ).strip()
+    except (OSError, subprocess.SubprocessError):
         return None
-    return output.strip().splitlines()[0]
 
 
-def substitute(command: list[str]) -> list[str]:
-    mapping = {"{python}": sys.executable, "{repo}": str(ROOT)}
-    return [mapping.get(token, token) for token in command]
+def sha256(path):
+    hasher = hashlib.sha256()
+    with open(path, "rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            hasher.update(chunk)
+    return hasher.hexdigest()
 
 
-def main() -> int:
-    plan = json.loads(PLAN_PATH.read_text(encoding="utf-8"))
-    commit = git_value("rev-parse", "HEAD")
-    if not commit or len(commit) != 40:
-        print("error: unresolved git HEAD", file=sys.stderr)
-        return 2
+def digest(path):
+    file_path = pathlib.Path(path)
+    return {
+        "path": file_path.relative_to(ROOT).as_posix(),
+        "sha256": sha256(file_path),
+        "sizeBytes": file_path.stat().st_size,
+    }
 
-    branch = git_value("rev-parse", "--abbrev-ref", "HEAD")
-    dirty = bool(
-        (git_value("status", "--porcelain", "--untracked-files=no") or "").strip()
+
+def expand(patterns):
+    seen = set()
+    files = []
+    for pattern in patterns:
+        for name in sorted(glob.glob(str(ROOT / pattern), recursive=True)):
+            file_path = pathlib.Path(name)
+            if (
+                file_path.is_file()
+                and file_path not in seen
+                and "evidence/out/" not in file_path.as_posix()
+            ):
+                seen.add(file_path)
+                files.append(digest(file_path))
+    return files
+
+
+def command_version(cmd):
+    try:
+        return subprocess.check_output(
+            cmd,
+            text=True,
+            stderr=subprocess.DEVNULL,
+        ).strip()
+    except (OSError, subprocess.SubprocessError):
+        return None
+
+
+def main():
+    cfg = json.loads(CFG_PATH.read_text(encoding="utf-8"))
+    shutil.rmtree(OUT, ignore_errors=True)
+    OUT.mkdir(parents=True, exist_ok=True)
+
+    git_commit = run_text(["git", "rev-parse", "HEAD"]) or ("0" * 40)
+    git_branch = run_text(["git", "rev-parse", "--abbrev-ref", "HEAD"])
+    dirty = bool(run_text(["git", "status", "--porcelain"]))
+
+    remote = (
+        run_text(["git", "config", "--get", "remote.origin.url"]) or cfg["repository"]
+    ).removesuffix(".git")
+    if remote.startswith("git@github.com:"):
+        remote = "https://github.com/" + remote.split(":", 1)[1]
+
+    command = cfg["verification_command"]
+    started = time.monotonic()
+    proc = subprocess.run(
+        command,
+        cwd=ROOT,
+        shell=True,
+        text=True,
+        capture_output=True,
+        check=False,
     )
-    run_id = (
-        dt.datetime.now(dt.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-        + "-"
-        + commit[:12]
-    )
-    output_base = Path(
-        os.environ.get("REPRO_OUT", str(ROOT / "artifacts" / "reproduction"))
-    )
-    if not output_base.is_absolute():
-        output_base = ROOT / output_base
-    output_dir = output_base / run_id
-    logs_dir = output_dir / "logs"
-    logs_dir.mkdir(parents=True, exist_ok=False)
+    duration = round(time.monotonic() - started, 3)
 
-    started_at = utc_now()
-    steps: list[dict[str, Any]] = []
-    all_passed = True
+    stdout = OUT / "verification.stdout.log"
+    stderr = OUT / "verification.stderr.log"
+    stdout.write_text(proc.stdout or "", encoding="utf-8")
+    stderr.write_text(proc.stderr or "", encoding="utf-8")
 
-    for index, step in enumerate(plan["steps"], start=1):
-        command = substitute(step["command"])
-        step_start = time.monotonic()
-        code, output = run_capture(command, ROOT / step.get("cwd", "."))
-        duration = round(time.monotonic() - step_start, 6)
-        safe_name = "".join(
-            char if char.isalnum() or char in "-_" else "-" for char in step["name"]
-        )
-        log_relative = Path("logs") / f"{index:02d}-{safe_name}.log"
-        (output_dir / log_relative).write_text(output, encoding="utf-8")
-        passed = code == 0
-        all_passed = all_passed and passed
-        steps.append(
-            {
-                "name": step["name"],
-                "command": command,
-                "cwd": step.get("cwd", "."),
-                "exit_code": code,
-                "duration_seconds": duration,
-                "passed": passed,
-                "log": log_relative.as_posix(),
-            }
-        )
-        if not passed and not step.get("continue_on_failure", False):
-            break
-
-    inputs: list[dict[str, str]] = []
-    missing_inputs: list[str] = []
-    for item in plan.get("inputs", []):
-        path = ROOT / item["path"]
-        if not path.exists():
-            missing_inputs.append(item["path"])
-            all_passed = False
-            continue
-        inputs.append(
-            {
-                "path": item["path"],
-                "kind": item.get("kind", "input"),
-                "sha256": sha256_path(path),
-            }
-        )
-
-    if not all_passed:
-        status = "FAILED"
-        rationale = "One or more reproduction steps or declared inputs failed verification."
-    elif dirty:
-        status = "PARTIAL"
-        rationale = (
-            "All declared steps passed, but tracked working-tree changes were present."
-        )
-    else:
-        status = "REPRODUCED"
-        rationale = (
-            "All declared deterministic reproduction steps passed from a clean tracked "
-            "working tree."
-        )
-
-    finished_at = utc_now()
-    summary_lines = [
-        f"# Reproduction Summary — {plan['project']['name']}",
-        "",
-        "- Contract: Production AI Evidence Contract v1.0.0",
-        f"- Commit: `{commit}`",
-        f"- Branch: `{branch}`",
-        f"- Dirty: `{str(dirty).lower()}`",
-        f"- Status: **{status}**",
-        "",
-        "## Verification steps",
-        "",
-    ]
-    for step in steps:
-        marker = "PASS" if step["passed"] else "FAIL"
-        summary_lines.append(
-            f"- **{marker}** — `{step['name']}` — exit `{step['exit_code']}` — "
-            f"{step['duration_seconds']:.3f}s"
-        )
-    summary_lines.extend(
-        [
-            "",
-            "## Interpretation",
-            "",
-            rationale,
-            "",
-            "Reproduction status does not grant domain-specific production authorization.",
-            "",
-        ]
-    )
-    summary_path = output_dir / "summary.md"
-    summary_path.write_text("\n".join(summary_lines), encoding="utf-8")
-
-    artifacts = []
-    for path in sorted([summary_path, *logs_dir.glob("*.log")]):
-        artifacts.append(
-            {
-                "path": path.relative_to(output_dir).as_posix(),
-                "sha256": sha256_file(path),
-                "media_type": "text/plain",
-            }
-        )
-
-    notes = list(plan.get("notes", []))
-    if missing_inputs:
-        notes.append("Missing declared inputs: " + ", ".join(missing_inputs))
-    notes.append("REPRODUCED is a reproduction status, not a deployment authorization.")
+    status = "PASS" if proc.returncode == 0 else "FAIL"
+    now = dt.datetime.now(dt.UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
     evidence = {
-        "contract_version": "1.0.0",
-        "generated_at": finished_at,
-        "contract_source": CONTRACT_SOURCE,
-        "schema_sha256": sha256_file(SCHEMA_PATH),
-        "repository": {
-            "name": plan["project"]["repository_name"],
-            "url": plan["project"]["repository_url"],
-            "git_commit": commit,
-            "branch": branch,
-            "dirty": dirty,
-        },
+        "contractVersion": "1.0.0",
+        "evidenceId": str(uuid.uuid4()),
+        "createdAt": now,
         "subject": {
-            "name": plan["project"]["name"],
-            "type": plan["project"]["subject_type"],
-            "version": plan["project"].get("version", "git:" + commit[:12]),
-            "candidate_id": plan["project"].get("candidate_id"),
+            "name": cfg["name"],
+            "type": cfg["subject_type"],
+            "repository": remote,
+            "gitCommit": git_commit,
+            "gitBranch": git_branch,
+            "version": cfg.get("version"),
+            "dirty": dirty,
         },
         "environment": {
             "os": platform.platform(),
             "architecture": platform.machine(),
             "python": sys.version.split()[0],
-            "tools": {
-                "git": tool_version(["git", "--version"]),
-                "node": tool_version(["node", "--version"]),
-                "npm": tool_version(["npm", "--version"]),
-                "make": tool_version(["make", "--version"]),
-            },
+            "node": command_version(["node", "--version"]),
+            "containerDigest": os.getenv("CONTAINER_DIGEST"),
+            "dependencyFiles": expand(cfg.get("dependency_patterns", [])),
         },
-        "inputs": inputs,
-        "execution": {
-            "started_at": started_at,
-            "finished_at": finished_at,
-            "steps": steps,
+        "inputs": expand(cfg.get("input_patterns", [])),
+        "benchmark": {
+            "name": cfg.get("benchmark_name"),
+            "version": cfg.get("benchmark_version"),
+            "files": expand(cfg.get("benchmark_patterns", [])),
+        },
+        "policy": {
+            "name": cfg.get("policy_name"),
+            "version": cfg.get("policy_version"),
+            "files": expand(cfg.get("policy_patterns", [])),
+        },
+        "evaluation": {
+            "verificationCommand": command,
+            "exitCode": proc.returncode,
+            "status": status,
+            "durationSeconds": duration,
+            "stdoutArtifact": stdout.name,
+            "stderrArtifact": stderr.name,
+            "metrics": {},
+        },
+        "approvals": {
+            "required": bool(cfg.get("approvals_required", False)),
+            "records": [],
         },
         "decision": {
-            "status": status,
-            "rationale": rationale,
-            "domain_decision": plan.get("domain_decision"),
-            "domain_decision_source": plan.get("domain_decision_source"),
+            "reproductionStatus": status,
+            "releaseState": None,
+            "reason": (
+                "Repository verification chain passed."
+                if status == "PASS"
+                else "Repository verification chain failed; inspect retained logs."
+            ),
         },
-        "artifacts": artifacts,
-        "notes": notes,
+        "provenance": {
+            "builder": "scripts/reproduce.py@production-ai-evidence-contract-v1",
+            "invocation": "make reproduce",
+            "source": {
+                "repository": remote,
+                "gitCommit": git_commit,
+            },
+        },
+        "artifacts": [digest(stdout), digest(stderr)],
+        "extensions": {
+            "schemaSha256": sha256(SCHEMA_PATH),
+            "note": ("Reproduction PASS is not a production SHIP/approval decision."),
+        },
     }
-    evidence_path = output_dir / "evidence.json"
-    evidence_path.write_text(
-        json.dumps(evidence, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-    )
 
-    checksum_targets = sorted([evidence_path, summary_path, *logs_dir.glob("*.log")])
-    checksum_text = "".join(
-        f"{sha256_file(path)}  {path.relative_to(output_dir).as_posix()}\n"
-        for path in checksum_targets
-    )
-    (output_dir / "checksums.sha256").write_text(checksum_text, encoding="utf-8")
-    (output_base / "LATEST").write_text(run_id + "\n", encoding="utf-8")
+    bundle = OUT / "evidence.json"
+    bundle.write_text(json.dumps(evidence, indent=2) + "\n", encoding="utf-8")
 
-    print(f"evidence: {output_dir}")
-    print(f"status: {status}")
-    return 0 if status in {"REPRODUCED", "PARTIAL"} else 1
+    checksums = "\n".join(f"{sha256(path)}  {path.name}" for path in [bundle, stdout, stderr])
+    (OUT / "checksums.sha256").write_text(checksums + "\n", encoding="utf-8")
+
+    summary = (
+        "# Reproduction Summary\n\n"
+        "- Contract: Production AI Evidence Contract v1.0.0\n"
+        f"- Subject: {cfg['name']}\n"
+        f"- Git commit: `{git_commit}`\n"
+        f"- Dirty working tree: `{dirty}`\n"
+        f"- Verification: **{status}**\n"
+        f"- Exit code: `{proc.returncode}`\n"
+        f"- Duration: `{duration}s`\n\n"
+        "> A reproduction PASS confirms the configured verification chain "
+        "completed successfully for this source/environment. It is not a "
+        "production release authorization.\n"
+    )
+    (OUT / "summary.md").write_text(summary, encoding="utf-8")
+
+    print(f"Production AI Evidence Contract v1: {status}")
+    print(f"Evidence: {bundle.relative_to(ROOT)}")
+    return proc.returncode
 
 
 if __name__ == "__main__":

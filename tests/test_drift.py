@@ -24,7 +24,7 @@ def test_duplicate_windows_cannot_satisfy_minimum_window_count():
 
 
 def test_naive_timestamps_are_rejected_before_window_sorting():
-    naive = replace(_snapshot(4), timestamp=datetime(2026, 9, 5))
+    naive = replace(_snapshot(4), timestamp=datetime(2026, 9, 5))  # noqa: DTZ001
     with pytest.raises(ValueError, match="timestamp"):
         assess_long_window([_snapshot(0), naive, _snapshot(8)])
 

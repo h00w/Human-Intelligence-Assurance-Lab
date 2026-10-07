@@ -17,6 +17,18 @@ def test_invalid_long_window_evidence_cannot_ship(field, value):
         assess_long_window(snapshots)
 
 
+def test_duplicate_windows_cannot_satisfy_minimum_window_count():
+    duplicate = replace(_snapshot(0), mean_latency_ms=1200)
+    with pytest.raises(ValueError, match="unique timestamps"):
+        assess_long_window([_snapshot(0), duplicate, _snapshot(8)])
+
+
+def test_naive_timestamps_are_rejected_before_window_sorting():
+    naive = replace(_snapshot(4), timestamp=datetime(2026, 9, 5))
+    with pytest.raises(ValueError, match="timestamp"):
+        assess_long_window([_snapshot(0), naive, _snapshot(8)])
+
+
 def _snapshot(day: int, decision: str = "SHIP"):
     return QualificationSnapshot(
         timestamp=datetime(2026, 9, 1, tzinfo=timezone.utc) + timedelta(days=day),

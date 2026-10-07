@@ -40,7 +40,13 @@ def assess_long_window(
 ) -> LongWindowReport:
     if not snapshots:
         return LongWindowReport(0, 0.0, 0.0, 0.0, 0.0, False, "WAITING", ("no time-separated snapshots",))
+    seen_timestamps: set[datetime] = set()
     for row in snapshots:
+        if not isinstance(row.timestamp, datetime) or row.timestamp.tzinfo is None or row.timestamp.utcoffset() is None:
+            raise ValueError("qualification snapshot has invalid timestamp")
+        if row.timestamp in seen_timestamps:
+            raise ValueError("qualification snapshots must have unique timestamps")
+        seen_timestamps.add(row.timestamp)
         for field in ("mean_latency_ms", "p95_latency_ms"):
             value = getattr(row, field)
             if isinstance(value, bool) or not isinstance(value, (int, float)) or not isfinite(value) or value < 0:

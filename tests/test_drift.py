@@ -68,3 +68,13 @@ def test_long_window_holds_on_regression():
     report = assess_long_window([_snapshot(0), _snapshot(4), bad])
     assert report.status == "HOLD"
     assert report.ready is False
+
+
+@pytest.mark.parametrize("field,value", [
+    ("minimum_windows", True), ("minimum_windows", 0), ("minimum_windows", 1.5),
+    ("minimum_span_days", -1), ("max_mean_latency_ms", float("nan")),
+    ("max_p95_latency_ms", float("inf")),
+])
+def test_invalid_qualification_policy_is_rejected(field, value):
+    with pytest.raises(ValueError, match=field):
+        assess_long_window([_snapshot(0), _snapshot(4), _snapshot(8)], **{field: value})

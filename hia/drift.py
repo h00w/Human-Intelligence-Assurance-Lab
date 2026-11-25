@@ -38,6 +38,15 @@ def assess_long_window(
     max_mean_latency_ms: float = 5000.0,
     max_p95_latency_ms: float = 8000.0,
 ) -> LongWindowReport:
+    if type(minimum_windows) is not int or minimum_windows < 1:
+        raise ValueError("minimum_windows must be a positive integer")
+    for name, limit in (
+        ("minimum_span_days", minimum_span_days),
+        ("max_mean_latency_ms", max_mean_latency_ms),
+        ("max_p95_latency_ms", max_p95_latency_ms),
+    ):
+        if isinstance(limit, bool) or not isinstance(limit, (int, float)) or not isfinite(limit) or limit < 0:
+            raise ValueError(f"{name} must be finite and non-negative")
     if not snapshots:
         return LongWindowReport(0, 0.0, 0.0, 0.0, 0.0, False, "WAITING", ("no time-separated snapshots",))
     seen_timestamps: set[datetime] = set()

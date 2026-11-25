@@ -24,7 +24,7 @@ def test_duplicate_windows_cannot_satisfy_minimum_window_count():
 
 
 def test_naive_timestamps_are_rejected_before_window_sorting():
-    naive = replace(_snapshot(4), timestamp=datetime(2026, 9, 5))  # noqa: DTZ001
+    naive = replace(_snapshot(4), timestamp=_snapshot(4).timestamp.replace(tzinfo=None))
     with pytest.raises(ValueError, match="timestamp"):
         assess_long_window([_snapshot(0), naive, _snapshot(8)])
 
@@ -68,3 +68,13 @@ def test_long_window_holds_on_regression():
     report = assess_long_window([_snapshot(0), _snapshot(4), bad])
     assert report.status == "HOLD"
     assert report.ready is False
+
+
+@pytest.mark.parametrize("field,value", [
+    ("minimum_windows", True), ("minimum_windows", 0), ("minimum_windows", 1.5),
+    ("minimum_span_days", -1), ("max_mean_latency_ms", float("nan")),
+    ("max_p95_latency_ms", float("inf")),
+])
+def test_invalid_qualification_policy_is_rejected(field, value):
+    with pytest.raises(ValueError, match=field):
+        assess_long_window([_snapshot(0), _snapshot(4), _snapshot(8)], **{field: value})
